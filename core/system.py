@@ -6,7 +6,7 @@ class System:
 
 	'''
 	def __init__(self):
-		self._system_clock = Clock(self)
+		self._system_clock_ref = Clock(self)
 
 
 	def xfer_from_host(self):

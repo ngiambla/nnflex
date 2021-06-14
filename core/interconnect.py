@@ -4,8 +4,6 @@ This class enables communication and data xfer between compute elements.
 
 
 '''
-from defines import DType, Operator
-
 from core.compackets import MemWritePacket, MemReadPacket
 from core.memory import Memory
 
@@ -17,10 +15,10 @@ class TransactionQueue:
         self._queue = list()
 
     def queue(self, data):
-        if len(self._queue) == self._max_availability:
-            return False
-        self._queue.append(data)
-        return True
+        if len(self._queue) < self._max_availability:
+            self._queue.append(data)
+            return True
+        return False
 
     def dequeue(self):
         if not self._queue:
@@ -44,7 +42,7 @@ class Interconnect:
         self._system_clock_ref = system_clock_ref
 
 
-    def add_connection(self, compute_element, queue_size = 1)
+    def add_connection(self, compute_element, queue_size = 1):
         '''add_connecton: Adds a compute element to this interconnect
 
         Notes:
@@ -76,7 +74,7 @@ class Interconnect:
 
     def is_neighbour_free(self, neighbour):
         if neighbour not in self._transaction_queue_map:
-            raise ValueError("Requested Neighbour is not on this interconnect."+str(destination))
+            raise ValueError("Requested Neighbour is not on this interconnect."+str(neighbour))
 
         return self._transaction_queue_map[neighbour].is_data_remaining()
 
@@ -95,21 +93,12 @@ class Interconnect:
             True if the transmisson was successful, False if the queue for the device is full.
             If False is returned, the source device should stall.
         '''
-
-        # First check if we are sending a memory-destinated packet to non memory.
-        if isinstance(data, MemReadPacket) or isinstance(data, MemWritePacket) and not isinstance(packet.destination(), Memory):
-            raise ValueError("Cannot send a Memory-Packet to a non memory unit: "+str(destination))
-
-        # Now check if we are sending a non memory packet to memory.
-        if not (isinstance(data, MemReadPacket) or isinstance(data, MemWritePacket)) and isinstance(packet.destination(), Memory):
-            raise ValueError("Cannot send a Data-Packet to a memory unit: "+str(destination))
-
-        if packet.destination() not in self._transaction_queue_map:
-            raise ValueError("Requested Destination is not on this interconnect."+str(destination))
+        if packet.destination_device() not in self._transaction_queue_map:
+            raise ValueError("Requested Destination is not on this interconnect."+str(packet.destination_device()))
 
         packet.stamp_sent(self._system_clock_ref.current_clock())
 
-        return self._transaction_queue_map[packet.destination()].queue(packet)
+        return self._transaction_queue_map[packet.destination_device()].queue(packet)
 
 
     def get_packet(self, requestor):
@@ -122,12 +111,17 @@ class Interconnect:
         Returns:
             A list with any packets available for the requestor. An empty list will be returned
             if there are no requests.
-        '''     
-        if not self._transaction_queue_map[requestor].is_data_remaining(self):
-            return None
+        '''
+        if requestor not in self._transaction_queue_map:
+            raise ValueError("Requestor is not registered on this interconnect. Please add it to the interconnect.")
 
         # Fetch the packet from the queue
         packet = self._transaction_queue_map[requestor].dequeue()
-        # Stamp the packet, now that it's been received.
-        packet.stamp_received(self._system_clock_ref.current_clock())
+        if packet is not None:
+            # Stamp the packet, now that it's been received.
+            packet.stamp_received(self._system_clock_ref.current_clock())
         return packet
+
+    def whats_on_the_interconnect(self):
+        for device in self._transaction_queue_map:
+            print("+= Interconnect["+str(self)+"]: "+str(device)+" => "+str(self._transaction_queue_map[device]._queue))

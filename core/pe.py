@@ -1,4 +1,5 @@
-from defines import DType, Operator
+''' pe.py
+'''
 
 class PE:
     '''PE: An abstraction on a Processing Element

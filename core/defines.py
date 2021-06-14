@@ -13,10 +13,10 @@ class DType(Enum):
     I64 = 64
 
 class Operator(Enum):
-	ADD = 1
-	SUB = 2
-	MULT = 3
-	DIV = 4
-	MAC = 5
+    ADD = 1
+    SUB = 2
+    MULT = 3
+    DIV = 4
+    MAC = 5
     CLEAR = 6
 

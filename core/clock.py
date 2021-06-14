@@ -1,4 +1,5 @@
-
+'''clock.py
+'''
 
 class Clock:
 	def __init__(self, top_level_device):
@@ -12,7 +13,7 @@ class Clock:
 			The clock count will only be incremented if and only if the
 			top-level devices issues the request.
 		'''
-		if top_level_device == self._top_level_device
+		if top_level_device == self._top_level_device:
 			self._clock += 1
 
 	def current_clock(self):

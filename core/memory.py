@@ -30,11 +30,12 @@ class Memory:
         
         self._system_clock_ref = system_clock_ref
         self._interconnect = interconnect
-        
+        self._interconnect.add_connection(self)
+
         self._is_external = is_external
 
         # Create a "fake" memory
-        self._memory = [None]*width
+        self._memory = [None]*int(width)
         self._word_sz = word_sz
         self._width = width 
 
@@ -44,7 +45,7 @@ class Memory:
 
 
 
-    def _peek(self, address: int, clock: int):
+    def _peek(self, address: int):
         '''_peek: Reads out contents from a memory address.
 
         Notes:
@@ -67,11 +68,11 @@ class Memory:
             raise ValueError("Reading uninitialized memory.")
 
 
-        If external memory, log this.
+        #If external memory, log this.
         if self._is_external:
             # We are using DRAMSim2
             # and the format is  <address_hex> <read/write> <Cycle_count>
-            transaction = ('0x%08x' % 42)+" read "+str(self._system_clock_ref.current_clock())
+            transaction = ('0x%08x' % address)+" read "+str(self._system_clock_ref.current_clock())
             self._transaction_log.append(transaction)
 
         return self._memory[address]
@@ -99,10 +100,18 @@ class Memory:
         self._memory[address] = contents
 
 
-        If external memory, log this.
+        #If external memory, log this.
         if self._is_external:
             # We are using DRAMSim2
             # and the format is  <address_hex> <read/write> <Cycle_count>
-            transaction = ('0x%08x' % 42)+" write "+str(self._system_clock_ref.current_clock())
+            transaction = ('0x%08x' % address)+" write "+str(self._system_clock_ref.current_clock())
             self._transaction_log.append(transaction)
+
+
+    def write_transaction_log(self):
+        if not self._is_external:
+            return
+
+        for transaction in self._transaction_log:
+            print(transaction)
 
