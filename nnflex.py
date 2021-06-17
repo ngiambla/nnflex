@@ -1,12 +1,22 @@
-import onnx
+''' nnflex.py: The main hook into the nnflex framework.
+
+Notes:
+
+
+
+'''
 import argparse
 
 from accelerators.nacl.nacl import NaCl, NaClSupportLayer
-
+from translator.onnx_to_nnflex import *
 
 class Tensor():
 	def __init__(self, data_list):
 		self.data = data_list
+
+
+
+
 
 
 
@@ -15,6 +25,8 @@ def main():
 	# parser.add_argument('-m','--model', help='Neural Network in ONNX', required=True)
 	# parser.add_argument('-c','--config', help='Accelerator Configuration', required=True)	
 	# parser.parse_args()
+
+	onnx_to_nnflex("examples/mnist.onnx")
 
 	local_nacl = NaCl(num_tile_rows=1, num_tile_cols=1)
 

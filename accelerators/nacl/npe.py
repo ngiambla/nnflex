@@ -3,7 +3,7 @@
 '''
 from core.defines import Operator
 from core.pe import PE 
-from core.compackets import DataPacket, PERespPacket
+from core.message import PEResponse
 
 
 
@@ -16,10 +16,10 @@ class NPE(PE):
     WAIT = 5
 
 
-    def __init__(self, system_clock_ref, interconnect):
-        PE.__init__(self, system_clock_ref, interconnect, queue_size = 1)
-        self._packet_to_process = None
-        self._packet_to_send = None
+    def __init__(self, system_clock_ref, message_router):
+        PE.__init__(self, system_clock_ref, message_router)
+        self._message_to_process = None
+        self._message_to_send = None
         self._accumulator = 0
         self._pipeline_stage = self.WAIT
         self._next_stage = self.WAIT
@@ -43,16 +43,16 @@ class NPE(PE):
         # If we are in DONE, actually process the data, 
         # Two outcomes are possible:
         # 1. If Destination queue is full... try and SEND_AGAIN
-        # 2. Otherwise, we can go back to waiting for a new packet to process!
+        # 2. Otherwise, we can go back to waiting for a new message to process!
         if self._pipeline_stage == self.DONE:
-            # Currently, we are ONLY forming a PERespPacket
-            op1 = self._packet_to_process.op1()
-            op2 = self._packet_to_process.op2()
-            dest = self._packet_to_process.source_device()
-            packet_id = self._packet_to_process.get_packet_id()
-            seq_num = self._packet_to_process.get_seq_num()
+            # Currently, we are ONLY forming a PEResponse message
+            op1 = self._message_to_process.op1()
+            op2 = self._message_to_process.op2()
+            dest = self._message_to_process.source_device()
+            message_id = self._message_to_process.get_message_id()
+            seq_num = self._message_to_process.get_seq_num()
 
-            operator = self._packet_to_process.operation()
+            operator = self._message_to_process.operation()
             result = 0
 
             if operator == Operator.ADD:
@@ -70,21 +70,21 @@ class NPE(PE):
                 self._accumulator = 0
                 result = self._accumulator
 
-            self._packet_to_send = PERespPacket(self, dest, packet_id, seq_num, result)
+            self._message_to_send = PEResponse(self, dest, message_id, seq_num, result)
             self._next_stage = self.RESP
 
         if self._pipeline_stage == self.RESP:
             self._next_stage = self.WAIT
-            if not self._interconnect.send(self._packet_to_send):
+            if not self._message_router.send(self._message_to_send):
                 self._next_stage = self.RESP
 
 
 
         if self._pipeline_stage == self.WAIT:
-            packet = self._interconnect.get_packet(self)
-            if packet is None:
+            message = self._message_router.fetch(self)
+            if message is None:
                 self._next_stage = self.WAIT
                 return
 
-            self._packet_to_process = packet
+            self._message_to_process = message
             self._next_stage = self.EXE1

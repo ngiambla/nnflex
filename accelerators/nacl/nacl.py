@@ -6,14 +6,13 @@ from enum import Enum
 
 
 from accelerators.nacl.nemem import NEMemory
-from accelerators.nacl.npe import NPE
-from accelerators.nacl.ntile import NTile, NTilePacketProc
+from accelerators.nacl.ntile import NTile
 
 from core.defines import Operator
 from core.system import System
-from core.clock import Clock
-from core.interconnect import Interconnect
-from core.compackets import TileReqPacket, TileRespPacket
+from core.message_router import MessageRouter
+from core.message import TileCommand
+from core.memory import MemoryMap
 
 
 class NaClSupportLayer(Enum):
@@ -40,19 +39,19 @@ class NaCl(System):
             "conv2d": NaClSupportLayer.CONV2D
         }
 
-        # Define the interconnects that will be used to transfer data and control packets.
+        # Define the interconnects that will be used to transfer data and control messages.
         #
-        # Control Interconnect:
-        self._tile_packet_interconnect = Interconnect(self._system_clock_ref)
-        self._tile_packet_queue_size = 2
-        self._tile_packet_interconnect.add_connection(self, self._tile_packet_queue_size)
+        # Tile-ONLY MessageRouter:
+        self._tile_message_router = MessageRouter(self._system_clock_ref)
+        self._tile_message_router_queue_size = 2
+        self._tile_message_router.add_connection(self, self._tile_message_router_queue_size)
 
-        # Data Interconnect
-        self._device_interconnect = Interconnect(self._system_clock_ref)
-        self._device_interconnect.add_connection(self)
+        # MessageRouter for all devices.
+        self._device_message_router = MessageRouter(self._system_clock_ref)
+        self._device_message_router.add_connection(self)
 
         # Define the External Memory.
-        self._memory = NEMemory(self._system_clock_ref, self._device_interconnect, width=1e6)
+        self._memory = NEMemory(self._system_clock_ref, self._device_message_router, width=1e6)
         # When loading data (weight, activation, grad, etc)
         # into the memory, we can simply use a memory ptr
         self._memory_pointer = 0
@@ -66,19 +65,19 @@ class NaCl(System):
         self._num_tile_cols = num_tile_cols
         # Create the tiles.
         # NOTE: This architecture has PEs connecting 1 another.
-        self._tiles = [[NTile(self._system_clock_ref, self._device_interconnect, 2, self._tile_packet_interconnect, 2, self._memory, 1, 1)]*self._num_tile_cols for i in range(self._num_tile_rows)]
+        self._tiles = [[NTile(self._system_clock_ref, self._device_message_router, 2, self._tile_message_router, 2, self._memory, 1, 1)]*self._num_tile_cols for i in range(self._num_tile_rows)]
 
 
         # Define Tile Packet Vars.
-        # For each packet we send to a tile, 
+        # For each Message we send to a tile, 
         # stamp it so it has an ID (we are going to track
         # responses from a tile.
-        self._packet_stamp = 0
+        self._message_stamp = 0
         # Hold a list (queue) of tile commands to send
         self._tile_commands = list()
         # Hold onto a set representing required responses
         self._tile_required_resp = set()
-        self._tile_resp_packets = list()
+        self._tile_resp_messages = list()
 
 
     def xfer_to_host(self, data):
@@ -117,9 +116,9 @@ class NaCl(System):
                 operator = Operator.ADD
                 dest = self._tiles[tile_row_idx][tile_col_idx]
                 
-                packet_stamp = self._packet_stamp                
-                self._tile_commands.append(TileReqPacket(self, dest, packet_stamp, op1_addr, op2_addr, res_addr, operator))
-                self._packet_stamp += 1
+                message_stamp = self._message_stamp                
+                self._tile_commands.append(TileCommand(self, dest, message_stamp, op1_addr, op2_addr, res_addr, operator))
+                self._message_stamp += 1
 
 
                 
@@ -129,15 +128,15 @@ class NaCl(System):
 
         # for i in range(0, 100000):
         while self._tile_commands or self._tile_required_resp:
-            self._fetch_tile_resp_packets()
-            packets_to_remove = list()
+            self._fetch_tile_resp_messages()
+            messages_to_remove = list()
             for i in range(len(self._tile_commands)):
-                tilepacket = self._tile_commands[i]
-                if self._tile_packet_interconnect.send(tilepacket):
-                    self._tile_required_resp.add(tilepacket.get_packet_id())
-                    packets_to_remove.append(i)
+                tile_message = self._tile_commands[i]
+                if self._tile_message_router.send(tile_message):
+                    self._tile_required_resp.add(tile_message.get_message_id())
+                    messages_to_remove.append(i)
 
-            for idx in packets_to_remove:
+            for idx in messages_to_remove:
                 self._tile_commands.pop(idx)
 
             self.process()
@@ -149,13 +148,10 @@ class NaCl(System):
         self._memory.write_transaction_log()
 
 
-        # Recall: def __init__(self, source, destination, op1_addr, op2_addr, res_addr, operation):
-
-
     def process(self):
         '''
         '''
-        self._system_clock_ref.clock(self)
+        self.tick()
 
         # Literally means to do an action in the clock cycle.
         self._memory.process()
@@ -167,22 +163,22 @@ class NaCl(System):
 
 
 
-    def _fetch_tile_resp_packets(self):
-        packets_to_remove = list()
+    def _fetch_tile_resp_messages(self):
+        messages_to_remove = list()
 
-        while (len(self._tile_resp_packets)) < self._tile_packet_queue_size:
-            packet = self._tile_packet_interconnect.get_packet(self)
-            if packet is None:
+        while (len(self._tile_resp_messages)) < self._tile_message_router_queue_size:
+            message = self._tile_message_router.fetch(self)
+            if message is None:
                 break
-            self._tile_resp_packets.append(packet)
+            self._tile_resp_messages.append(message)
 
-        for i in range(len(self._tile_resp_packets)):
-            packet = self._tile_resp_packets[i]
-            self._tile_required_resp.remove(packet.get_packet_id())
-            packets_to_remove.append(i)
+        for i in range(len(self._tile_resp_messages)):
+            message = self._tile_resp_messages[i]
+            self._tile_required_resp.remove(message.get_message_id())
+            messages_to_remove.append(i)
 
-        for packet_idx in packets_to_remove:
-            self._tile_resp_packets.pop(packet_idx)
+        for message_idx in messages_to_remove:
+            self._tile_resp_messages.pop(message_idx)
 
 
 

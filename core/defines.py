@@ -1,4 +1,4 @@
-'''
+''' defines.py
 '''
 from enum import Enum
 
@@ -19,4 +19,7 @@ class Operator(Enum):
     DIV = 4
     MAC = 5
     CLEAR = 6
+
+
+
 

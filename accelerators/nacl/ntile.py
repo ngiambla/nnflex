@@ -8,11 +8,11 @@ from accelerators.nacl.npe import NPE
 from core.defines import Operator
 from core.pe import PE
 from core.tile import Tile
-from core.compackets import *
-from core.interconnect import Interconnect
+from core.message import *
+from core.message_router import MessageRouter
 
 
-class NTilePacketProc():
+class NTileMessageProc():
     '''
     '''
     SEND_READ = 1
@@ -24,28 +24,28 @@ class NTilePacketProc():
     SEND_ACK = 7
     TERMINATE = 8
 
-    def __init__(self, mem, tile_packet):
+    def __init__(self, mem, tile_message):
         self._mem = mem
-        self._tile_packet = tile_packet
-        # First, grab the tile packet ID
-        self._tile_packet_id = hex(id(self._tile_packet))
+        self._tile_message = tile_message
+        # First, grab the tile message ID
+        self._tile_message_id = hex(id(self._tile_message))
 
         # Parse the first operand of the TilePacket
-        source = self._tile_packet.destination_device()
-        #source, destination, packet_id, seq_num, address
-        self._read_req_op1 = MemReadPacket(source, self._mem, self._tile_packet_id, 0, self._tile_packet.op1_addr())
+        source = self._tile_message.destination_device()
+        #source, destination, message_id, seq_num, address
+        self._read_req_op1 = MemoryReadRequest(source, self._mem, self._tile_message_id, 0, self._tile_message.op1_addr())
         self._read_req_op1_sent = False
         self._read_resp_op1 = None
 
         # Parse the second operand of the TilePacket
-        self._read_req_op2 = MemReadPacket(source, self._mem, self._tile_packet_id, 1, self._tile_packet.op2_addr())
+        self._read_req_op2 = MemoryReadRequest(source, self._mem, self._tile_message_id, 1, self._tile_message.op2_addr())
         self._read_req_op2_sent = False
         self._read_resp_op2 = None
 
-        self._pe_packet_sent = False
-        self._pe_packet_resp = None
+        self._pe_message_sent = False
+        self._pe_message_resp = None
 
-        self._mem_write_packet = None
+        self._mem_write_message = None
 
         self._current_stage = self.SEND_READ
         self._next_stage = self.SEND_READ
@@ -57,7 +57,7 @@ class NTilePacketProc():
 
 
 
-    def send_read_reqs(self, interconnect):
+    def send_read_reqs(self, message_router):
         '''
         '''
         if self._current_stage != self.SEND_READ:
@@ -65,27 +65,27 @@ class NTilePacketProc():
 
         self._next_stage = self.SEND_READ
         if not self._read_req_op1_sent:
-            self._read_req_op1_sent = interconnect.send(self._read_req_op1)
+            self._read_req_op1_sent = message_router.send(self._read_req_op1)
 
         if not self._read_req_op2_sent:
-            self._read_req_op2_sent = interconnect.send(self._read_req_op2)
+            self._read_req_op2_sent = message_router.send(self._read_req_op2)
 
         if self._read_req_op1_sent and self._read_req_op2_sent:
             self._next_stage = self.WAIT_FOR_READ
 
 
-    def listen_for_read_response(self,mem_ack_packet):
+    def listen_for_read_response(self,mem_ack_message):
         '''
         '''
         if self._current_stage != self.WAIT_FOR_READ:
             return False
 
-        if self._tile_packet_id == mem_ack_packet.get_packet_id():
-            if mem_ack_packet.get_seq_num() == 0:
-                self._read_resp_op1 = mem_ack_packet
+        if self._tile_message_id == mem_ack_message.get_message_id():
+            if mem_ack_message.get_seq_num() == 0:
+                self._read_resp_op1 = mem_ack_message
                 return True
-            if mem_ack_packet.get_seq_num() == 1:
-                self._read_resp_op2 = mem_ack_packet
+            if mem_ack_message.get_seq_num() == 1:
+                self._read_resp_op2 = mem_ack_message
                 return True
         return False
 
@@ -98,7 +98,7 @@ class NTilePacketProc():
         if self._read_resp_op1 is not None and self._read_resp_op2 is not None:
             self._next_stage = self.DISPATCH
 
-    def dispatch_to_PE(self, interconnect, PE):
+    def dispatch_to_PE(self, message_router, PE):
         if self._current_stage != self.DISPATCH:
             return False
 
@@ -109,48 +109,48 @@ class NTilePacketProc():
 
         op1 = self._read_resp_op1.content()
         op2 = self._read_resp_op2.content()
-        operation = self._tile_packet.operation()
-        source = self._tile_packet.destination_device()
+        operation = self._tile_message.operation()
+        source = self._tile_message.destination_device()
  
-        PE_packet = PEReqPacket(source, PE, self._tile_packet_id, 0, op1, op2, operation)
+        PE_message = PECommand(source, PE, self._tile_message_id, 0, op1, op2, operation)
  
-        if interconnect.send(PE_packet):
-            self._pe_packet_sent = True
+        if message_router.send(PE_message):
+            self._pe_message_sent = True
             self._next_stage = self.WAIT_FOR_PE
             return True
 
         return False
 
-    def listen_for_PE_response(self, PE_response_packet):
+    def listen_for_PE_response(self, PE_response_message):
         if self._current_stage != self.WAIT_FOR_PE:
             return False
 
         self._next_stage = self.WAIT_FOR_PE
 
-        if PE_response_packet.get_packet_id() != self._tile_packet_id:
+        if PE_response_message.get_message_id() != self._tile_message_id:
             return False
         
-        self._pe_packet_resp = PE_response_packet
+        self._pe_message_resp = PE_response_message
         self._next_stage = self.WRITE_BACK
         return True
 
-    def write_result(self, interconnect):
+    def write_result(self, message_router):
         if self._current_stage != self.WRITE_BACK:
             return
 
         self._next_stage = self.WRITE_BACK
 
-        res_addr = self._tile_packet.res_addr()
-        if interconnect.send(MemWritePacket(self._tile_packet.destination_device(), self._mem, self._tile_packet_id, 0, res_addr, self._pe_packet_resp.result())):
+        res_addr = self._tile_message.res_addr()
+        if message_router.send(MemoryWriteRequest(self._tile_message.destination_device(), self._mem, self._tile_message_id, 0, res_addr, self._pe_message_resp.result())):
             self._next_stage = self.WAIT_FOR_WRITE_ACK
 
 
-    def wait_for_memwrite_ack(self, mem_write_ack_packet):
+    def wait_for_memwrite_ack(self, mem_write_ack_message):
         if self._current_stage != self.WAIT_FOR_WRITE_ACK:
             return False
 
         self._next_stage = self.WAIT_FOR_WRITE_ACK
-        if mem_write_ack_packet.get_packet_id() == self._tile_packet_id:
+        if mem_write_ack_message.get_message_id() == self._tile_message_id:
             self._next_stage = self.SEND_ACK
             return True
 
@@ -158,14 +158,14 @@ class NTilePacketProc():
 
 
 
-    def send_ack_to_sys(self, interconnect):
+    def send_ack_to_sys(self, message_router):
         if self._current_stage != self.SEND_ACK:
             return 
 
         self._next_stage = self.SEND_ACK
-        src = self._tile_packet.destination_device()
-        dst = self._tile_packet.source_device()
-        if interconnect.send(TileRespPacket(src, dst, self._tile_packet.get_packet_id())):
+        src = self._tile_message.destination_device()
+        dst = self._tile_message.source_device()
+        if message_router.send(TileCommandComplete(src, dst, self._tile_message.get_message_id())):
             self._next_stage = self.TERMINATE
 
 
@@ -173,115 +173,107 @@ class NTilePacketProc():
 
 class NTile(Tile): 
 
-    def __init__(self, system_clock_ref, device_interconnect, data_queue_size, tile_packet_interconnect, tile_packet_queue_size, offchip_memory, num_pe_rows = 1, num_pe_cols = 1):
-        Tile.__init__(self, system_clock_ref, device_interconnect, data_queue_size)
+    def __init__(self, system_clock_ref, device_message_router, data_queue_size, tile_message_router, tile_message_queue_size, offchip_memory, num_pe_rows = 1, num_pe_cols = 1):
+        Tile.__init__(self, system_clock_ref, device_message_router, data_queue_size)
 
         # Handling TilePacket Requests
-        self._tile_packet_processor_queue = list()
-        self._tile_packet_interconnect = tile_packet_interconnect
-        self._tile_packet_interconnect.add_connection(self)
+        self._tile_message_processor_queue = list()
+        self._tile_message_router = tile_message_router
+        self._tile_message_router.add_connection(self)
 
         self._offchip_memory = offchip_memory
  
-        # Create a local interconnect.
-        # self._local_interconnect = Interconnect(self._system_clock_ref)
-
-        # # Create a local memory to buffer data.
-        # self._local_memory = Memory()
-
-        # # Add the memories to the local interconnect
-        # self._local_interconnect.add(self._local_memory)
 
         # From the initialization parameters, 
         self._num_pe_rows = num_pe_rows
         self._num_pe_cols = num_pe_cols
-        self._pe_grid = [[NPE(self._system_clock_ref, device_interconnect)]*self._num_pe_cols for i in range(self._num_pe_rows)]
+        self._pe_grid = [[NPE(self._system_clock_ref, device_message_router)]*self._num_pe_cols for i in range(self._num_pe_rows)]
 
-        # To handle more than 1 packet at a time.
-        self._packet_buffer = list()
-        self._packet_size = 2
+        # To handle more than 1 message at a time.
+        self._message_buffer = list()
+        self._message_size = 2
 
 
 
     def process(self):
 
 
-        self._fetch_tile_packets()
-        self._fetch_comm_packets()
+        self._fetch_tile_messages()
+        self._fetch_comm_messages()
 
-        packets_to_remove = set()
+        messages_to_remove = set()
         processors_to_remove = set()
 
 
-        for i in range(len(self._tile_packet_processor_queue)):
-            packet_processor = self._tile_packet_processor_queue[i]
-            proc_stage = packet_processor.update_stage()
+        for i in range(len(self._tile_message_processor_queue)):
+            message_processor = self._tile_message_processor_queue[i]
+            proc_stage = message_processor.update_stage()
 
             # Remove the processor.
-            if proc_stage == NTilePacketProc.TERMINATE:
+            if proc_stage == NTileMessageProc.TERMINATE:
                 processors_to_remove.add(i)
                 continue
 
-            if proc_stage == NTilePacketProc.SEND_READ:
-                packet_processor.send_read_reqs(self._interconnect)
+            if proc_stage == NTileMessageProc.SEND_READ:
+                message_processor.send_read_reqs(self._message_router)
                 continue
 
-            if proc_stage == NTilePacketProc.WAIT_FOR_READ:  
-                for j in range(len(self._packet_buffer)):
-                    packet = self._packet_buffer[j]
-                    if isinstance(packet, MemReadAckPacket):
-                        if packet_processor.listen_for_read_response(packet):
-                            packets_to_remove.add(j)
-                packet_processor.handle_read_response()
+            if proc_stage == NTileMessageProc.WAIT_FOR_READ:  
+                for j in range(len(self._message_buffer)):
+                    message = self._message_buffer[j]
+                    if isinstance(message, MemoryReadComplete):
+                        if message_processor.listen_for_read_response(message):
+                            messages_to_remove.add(j)
+                message_processor.handle_read_response()
                 continue
 
-            if proc_stage == NTilePacketProc.DISPATCH:
+            if proc_stage == NTileMessageProc.DISPATCH:
                 pe_hit = False            
                 for i in range(self._num_pe_rows):
                     for j in range(self._num_pe_cols):
                         # get PE.
-                        if packet_processor.dispatch_to_PE(self._interconnect, self._pe_grid[i][j]):
+                        if message_processor.dispatch_to_PE(self._message_router, self._pe_grid[i][j]):
                             pe_hit = True 
                             break
                     if pe_hit:
                         break
                 continue
 
-            if proc_stage == NTilePacketProc.WAIT_FOR_PE:
+            if proc_stage == NTileMessageProc.WAIT_FOR_PE:
                 #listen_for_PE_response
-                for j in range(len(self._packet_buffer)):
-                    packet = self._packet_buffer[j]
-                    if isinstance(packet, PERespPacket):     
-                        if packet_processor.listen_for_PE_response(packet):
-                            packets_to_remove.add(j)
+                for j in range(len(self._message_buffer)):
+                    message = self._message_buffer[j]
+                    if isinstance(message, PEResponse):     
+                        if message_processor.listen_for_PE_response(message):
+                            messages_to_remove.add(j)
                             break
                 continue
 
-            if proc_stage == NTilePacketProc.WRITE_BACK:
-                packet_processor.write_result(self._interconnect)
+            if proc_stage == NTileMessageProc.WRITE_BACK:
+                message_processor.write_result(self._message_router)
                 continue
 
-            if proc_stage == NTilePacketProc.WAIT_FOR_WRITE_ACK:
-                for j in range(len(self._packet_buffer)):
-                    packet = self._packet_buffer[j]
-                    if isinstance(packet, MemWriteAckPacket):     
-                        if packet_processor.wait_for_memwrite_ack(packet):
-                            packets_to_remove.add(j)
+            if proc_stage == NTileMessageProc.WAIT_FOR_WRITE_ACK:
+                for j in range(len(self._message_buffer)):
+                    message = self._message_buffer[j]
+                    if isinstance(message, MemoryWriteComplete):     
+                        if message_processor.wait_for_memwrite_ack(message):
+                            messages_to_remove.add(j)
                             break
                 continue
 
-            if proc_stage == NTilePacketProc.SEND_ACK:
-                packet_processor.send_ack_to_sys(self._tile_packet_interconnect)
+            if proc_stage == NTileMessageProc.SEND_ACK:
+                message_processor.send_ack_to_sys(self._tile_message_router)
                 continue
 
 
-        # Remove the packets that were processed.
-        for packet_idx in packets_to_remove:
-            self._packet_buffer.pop(packet_idx)
+        # Remove the messages that were processed.
+        for message_idx in messages_to_remove:
+            self._message_buffer.pop(message_idx)
 
         # Remove the TilePacketProcessors that have completed.
-        for packet_idx in processors_to_remove:
-            self._tile_packet_processor_queue.pop(packet_idx)
+        for message_idx in processors_to_remove:
+            self._tile_message_processor_queue.pop(message_idx)
              
         # Now, process all the PEs. 
         for i in range(self._num_pe_rows):
@@ -291,16 +283,16 @@ class NTile(Tile):
 
 
 
-    def _fetch_comm_packets(self):
-        while (len(self._packet_buffer)) < self._packet_size:
-            packet = self._interconnect.get_packet(self)
-            if packet is None:
+    def _fetch_comm_messages(self):
+        while (len(self._message_buffer)) < self._message_size:
+            message = self._message_router.fetch(self)
+            if message is None:
                 return
-            self._packet_buffer.append(packet)
+            self._message_buffer.append(message)
 
-    def _fetch_tile_packets(self):
-        while(len(self._tile_packet_processor_queue)) < self._packet_size:
-            packet = self._tile_packet_interconnect.get_packet(self)
-            if packet is None:
+    def _fetch_tile_messages(self):
+        while(len(self._tile_message_processor_queue)) < self._message_size:
+            message = self._tile_message_router.fetch(self)
+            if message is None:
                 return
-            self._tile_packet_processor_queue.append(NTilePacketProc(self._offchip_memory, packet))
+            self._tile_message_processor_queue.append(NTileMessageProc(self._offchip_memory, message))

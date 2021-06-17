@@ -6,7 +6,7 @@ from enum import Enum
 
 
 from core.memory import Memory
-from core.compackets import MemWritePacket, MemWriteAckPacket, MemReadPacket, MemReadAckPacket
+from core.message import MemoryWriteRequest, MemoryWriteComplete, MemoryReadRequest, MemoryReadComplete
 
 
 class ReadStage(Enum):
@@ -28,37 +28,38 @@ class NEMemory(Memory):
     ''' NEMemory: Nick's External Memory, Single Port...
 
     Args:
-        is_external: Determines if the memory should be made external (DRAM) or internal (SRAM-ish).
-        word_sz: The number of bytes to be read 
-        width:  The number of words in the memory (e.g., words*word_sz bytes large)
-        cycles_per_read: The numbers of cycles (estimated) required for a read.
-        cycles_per_write: The number of cycles (estimated) required for a write.
-
+         system_clock_ref: The reference to the system clock.
+        message_router: The router to handle communication transactions.
+        message_queue_size: The number of additional Messages for the router to store when busy (default: 1)
+        log_transactions: If we wish to store this to a 
+        word_byte_size: The number of bytes per memory cell.
+        width:  The number of words in the memory (e.g., words*word_byte_size bytes large)
+           
     Returns:
         A "Memory" object.
     '''
-    def __init__(self, system_clock_ref, interconnect, word_sz = 4, width = 10000):
+    def __init__(self, system_clock_ref, message_router, word_byte_size = 4, width = 10000):
 
-        Memory.__init__(self, system_clock_ref, interconnect, True, word_sz, width)
+        Memory.__init__(self, system_clock_ref, message_router, 1, True, word_byte_size, width)
 
-        self._current_read_packet = None
+        self._current_read_message = None
         self._current_read_stage = ReadStage.WAIT
         self._next_read_stage = ReadStage.WAIT
-        self._read_ackd_packet = None
+        self._read_ackd_message = None
 
 
-        self._current_write_packet = None
+        self._current_write_message = None
         self._current_write_stage = WriteStage.WAIT
         self._next_write_stage = WriteStage.WAIT
-        self._write_ackd_packet = None
+        self._write_ackd_message = None
 
-        # To handle more than 1 packet at a time.
-        self._packet_buffer = list()
-        self._packet_size = 1
+        # To handle more than 1 message at a time.
+        self._message_buffer = list()
+        self._message_size = 1
 
     def process(self):
 
-        self._load_packets_from_interconnect()
+        self._load_messages_from_message_router()
         self._process_write()
         self._process_read()
 
@@ -72,30 +73,30 @@ class NEMemory(Memory):
             self._next_write_stage = WriteStage.WRITE_DONE
 
         if self._current_write_stage == WriteStage.WRITE_DONE:
-            destination = self._current_write_packet.source_device()            
-            address = self._current_write_packet.address()
-            content = self._current_write_packet.data()
+            destination = self._current_write_message.source_device()            
+            address = self._current_write_message.address()
+            content = self._current_write_message.data()
             self._poke(address, content)
-            self._write_ackd_packet = MemWriteAckPacket(self, destination, self._current_write_packet.get_packet_id(), self._current_write_packet.get_seq_num())
+            self._write_ackd_message = MemoryWriteComplete(self, destination, self._current_write_message.get_message_id(), self._current_write_message.get_seq_num())
             self._next_write_stage = WriteStage.WRITE_SEND
 
         if self._current_write_stage == WriteStage.WRITE_SEND:
             self._next_write_stage = WriteStage.WRITE_SEND
-            if self._interconnect.send(self._write_ackd_packet):
+            if self._message_router.send(self._write_ackd_message):
                 self._next_write_stage = WriteStage.WAIT
 
         if self._current_write_stage == WriteStage.WAIT:
             self._next_write_stage = WriteStage.WAIT
-            packets_to_remove = list()
-            for i in range(len(self._packet_buffer)):
-                packet = self._packet_buffer[i]
-                if isinstance(packet, MemWritePacket):
-                    self._current_write_packet = packet
-                    packets_to_remove.append(i)
+            messages_to_remove = list()
+            for i in range(len(self._message_buffer)):
+                message = self._message_buffer[i]
+                if isinstance(message, MemoryWriteRequest):
+                    self._current_write_message = message
+                    messages_to_remove.append(i)
                     self._next_write_stage = WriteStage.WRITE_I
                     break
-            for packet_idx in packets_to_remove:
-                self._packet_buffer.pop(packet_idx)
+            for message_idx in messages_to_remove:
+                self._message_buffer.pop(message_idx)
 
 
 
@@ -110,35 +111,35 @@ class NEMemory(Memory):
 
         if self._current_read_stage == ReadStage.READ_DONE:
             self._next_read_stage = ReadStage.READ_SEND
-            destination = self._current_read_packet.source_device()
-            address = self._current_read_packet.address()
+            destination = self._current_read_message.source_device()
+            address = self._current_read_message.address()
             content = self._peek(address)
-            self._read_ackd_packet = MemReadAckPacket(self, destination, self._current_read_packet.get_packet_id(), self._current_read_packet.get_seq_num(), address,content)
+            self._read_ackd_message = MemoryReadComplete(self, destination, self._current_read_message.get_message_id(), self._current_read_message.get_seq_num(), address,content)
 
         if self._current_read_stage == ReadStage.READ_SEND:
             self._next_read_stage = ReadStage.READ_SEND
-            if self._interconnect.send(self._read_ackd_packet):
+            if self._message_router.send(self._read_ackd_message):
                 self._next_read_stage = ReadStage.WAIT
 
         if self._current_read_stage == ReadStage.WAIT:
             self._next_read_stage = ReadStage.WAIT
-            packets_to_remove = list()
-            for i in range(len(self._packet_buffer)):
-                packet = self._packet_buffer[i]
-                if isinstance(packet, MemReadPacket):
-                    self._current_read_packet = packet
-                    packets_to_remove.append(i)
+            messages_to_remove = list()
+            for i in range(len(self._message_buffer)):
+                message = self._message_buffer[i]
+                if isinstance(message, MemoryReadRequest):
+                    self._current_read_message = message
+                    messages_to_remove.append(i)
                     self._next_read_stage = ReadStage.READ_I
                     break
 
-            for packet_idx in packets_to_remove:
-                self._packet_buffer.pop(packet_idx)
+            for message_idx in messages_to_remove:
+                self._message_buffer.pop(message_idx)
 
 
-    def _load_packets_from_interconnect(self):
-        while len(self._packet_buffer) < self._packet_size:
-            packet = self._interconnect.get_packet(self)
-            if packet is None:
+    def _load_messages_from_message_router(self):
+        while len(self._message_buffer) < self._message_size:
+            message = self._message_router.fetch(self)
+            if message is None:
                 return
-            self._packet_buffer.append(packet)
+            self._message_buffer.append(message)
 
