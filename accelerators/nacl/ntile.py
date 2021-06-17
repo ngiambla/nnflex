@@ -191,7 +191,7 @@ class NTile(Tile):
 
         # To handle more than 1 message at a time.
         self._message_buffer = list()
-        self._message_size = 2
+        self._message_size = tile_message_queue_size
 
 
 

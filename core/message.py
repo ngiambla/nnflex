@@ -286,7 +286,6 @@ class TileCommand(Message):
         source: The compute element which is sending the message
         destination: The compute element which is to receive the message.
         message_id: An identifier to classify what message sequence this belongs to.
-        seq_num: An ordered response associated with message_id
         op1_addr: The address (memory) of the first operand (left-hand side)
         op2_addr: The address (memory) of the second operand (right-hand side)
         res_addr: The address (memory) of the where to store the result.

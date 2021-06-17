@@ -22,13 +22,14 @@ class MemoryMapper:
     def map(self, array):
         array_id = id(array)
         self._memory_map[array_id] = self._allocator.alloc(array.nbytes)
+        return self._memory_map[array_id]
 
 
     def lookup(self, array):
         array_id = id(array)
         if array_id not in self._memory_map:
             raise ValueError("Array was not mapped into memory.")
-    	return self._memory_map[array_id]
+        return self._memory_map[array_id]
 
 
     def unmap(self, array):
@@ -40,4 +41,4 @@ class MemoryMapper:
         self._allocator.free(addr)
         del self._memory_map[array_id]
 
-    	
+        

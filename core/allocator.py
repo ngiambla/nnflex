@@ -142,7 +142,7 @@ class BitAlloc():
                 bits_acquired += 1
 
                 if bits_acquired == num_required_bits:
-                    self._bitmap[i] = current_map               
+                    self._bitmap[i] = current_map
                     all_bits_set = True
                     break
 

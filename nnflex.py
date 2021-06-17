@@ -8,15 +8,13 @@ Notes:
 import argparse
 
 from accelerators.nacl.nacl import NaCl, NaClSupportLayer
-from translator.onnx_to_nnflex import *
+from translator.onnx2flex import ONNX2Flex
+import numpy as np
+
 
 class Tensor():
 	def __init__(self, data_list):
 		self.data = data_list
-
-
-
-
 
 
 
@@ -26,15 +24,16 @@ def main():
 	# parser.add_argument('-c','--config', help='Accelerator Configuration', required=True)	
 	# parser.parse_args()
 
-	onnx_to_nnflex("examples/mnist.onnx")
+	onnx2flex = ONNX2Flex("examples/mnist.onnx")
+	onnx2flex.translate()
 
-	local_nacl = NaCl(num_tile_rows=1, num_tile_cols=1)
+	# local_nacl = NaCl(num_tile_rows=10, num_tile_cols=10)
 
-	in_acts = Tensor(list(range(1, 5)))
-	weights = Tensor(list(range(1, 5)))
-	outputs = Tensor(list(range(1, 5)))
-	local_nacl.forward("elemwiseadd", in_acts, weights, outputs)
-	print(outputs.data)
+	# in_acts = np.asarray(list(range(1, 1000)))
+	# weights = np.asarray(list(range(1, 1000)))
+	# outputs = np.asarray(list(range(1, 1000)))
+	# local_nacl.forward("elemwiseadd", in_acts, weights, outputs)
+	# print(outputs)
 
 
 
