@@ -4,7 +4,7 @@ This class enables communication and data transfer between devices.
 
 '''
 
-from core.message import Message
+from core.messaging import Message
 from core.clock import ClockReference
 
 

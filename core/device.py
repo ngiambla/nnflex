@@ -21,5 +21,3 @@ class Device:
 
         self._message_router = message_router
         self._message_router.add_connection(self, message_queue_size)
-
-        self._state_machine = Machine(model=self)

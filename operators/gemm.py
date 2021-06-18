@@ -1,6 +1,6 @@
-''' conv.py:
+''' gemm.py:
 
-Implement's the conv ONNX node as a flexnode (for use with any accelerator)
+Implement's the GeMM ONNX node as a flexnode (for use with any accelerator)
 
 '''
 import uuid
@@ -11,25 +11,25 @@ from operators.flexnode import FlexNode
 from core.defines import Operator
 from core.messaging import Message
   
-class Conv(FlexNode):
+class GeMM(FlexNode):
 
     def __init__(self, onnx_node, inputs, outputs):
         FlexNode.__init__(self, onnx_node, inputs, outputs)
 
-        self._autopad = "NOTSET"
-        self._dilations = None
-        self._group = 1
-        self._kernel_shape = None
-        self._pads = None
-        self._strides = None
+        self._alpha = 1.0
+        self._beta = 1.0
+        self._transA = 0
+        self._transB = 0
 
         self.fill_attributes(onnx_node)
 
-        in1 = self._inputs[0]
+        in1 = self._inputs[0] if self._transA == 0 else np.transpose(self._inputs[0])
+        in1 *= self._alpha
         self._in1_shape = in1.shape
         self._in1_flat = in1.flatten()
 
-        in2 = self._inputs[1]
+        in2 = self._inputs[1] if self._transB == 0 else np.transpose(self._inputs[1])
+        self._in2_shape = in2.shape
         self._in2_flat = in2.flatten()
         
 
@@ -40,7 +40,7 @@ class Conv(FlexNode):
         in3 = None
         self._in3_flat = None
         if len(self._inputs) == 3:
-            in3 = np.broadcast_to(self._inputs[2], self._out_shape)
+            in3 = self._beta * np.broadcast_to(self._inputs[2], self._out_shape)
             self._in3_shape = in3.shape
             self._in3_flat = in3.flatten()
 
@@ -52,18 +52,14 @@ class Conv(FlexNode):
 
     def fill_attributes(self, onnx_node):
         for attr in onnx_node.attribute:
-            if attr.name == "auto_pad":
-                self._autopad = attr.s
-            if attr.name == "dilations":
-                self._dilations = attr.ints
-            if attr.name == "group":
-                self._group = int(attr.i)
-            if attr.name == "kernel_shape":
-                self._kernel_shape = attr.ints
-            if attr.name == "pads":
-                self._pads = attr.ints
-            if attr.name == "strides":
-                self._strides = attr.ints
+            if attr.name == "alpha":
+                self._alpha = float(attr.f)
+            if attr.name == "beta":
+                self._beta = float(attr.f)
+            if attr.name == "transA":
+                self._transA = int(attr.i)
+            if attr.name == "transB":
+                self._transB = int(attr.i)
 
 
 
@@ -102,17 +98,18 @@ class Conv(FlexNode):
         in1_shape = self._in1_shape
         in2_shape = self._in2_shape
 
-        batches = out_shape[0]
-        
-        num_cols_out = out_shape[1]
+        in1_rows = in1_shape[0]
+        in2_rows = in2_shape[0]
+        in2_cols = in2_shape[1]
 
-        for i in range(num_rows_out):
-            for j in range(num_cols_out):
+        for i in range(in1_rows):
+            for j in range(in2_cols):
                 row_addrs = list()
                 col_addrs = list()
+                print(i, j)
                 out_idx = self.ravel_multi_index([i,j], out_shape) + self._out_offset
 
-                for k in range(num_cols_out):
+                for k in range(in2_rows):
                     row_addrs.append(self.ravel_multi_index([i,k], in1_shape)+self._in1_offset)
                     col_addrs.append(self.ravel_multi_index([k,j], in2_shape)+self._in2_offset)
 

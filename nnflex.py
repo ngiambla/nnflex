@@ -7,7 +7,7 @@ Notes:
 '''
 import argparse
 
-from accelerators.nacl.nacl import NaCl, NaClSupportLayer
+# from accelerators.nacl.nacl import NaCl, NaClSupportLayer
 from translator.onnx2flex import ONNX2Flex
 import numpy as np
 

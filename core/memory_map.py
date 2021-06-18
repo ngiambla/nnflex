@@ -20,12 +20,57 @@ class MemoryMapper:
         self._allocator = BitAlloc(memory_size, word_size)
 
     def map(self, array):
+        ''' map:
+
+        Given a numpy array, maps this into valid memory-locations
+
+        Notes:
+            self._allocator.alloc(nbytes) can return None,
+            indicating that the memory does not have enough memory
+            to service the allocation. We raise a runtime error if that's the case.
+
+        Args:
+            array: A numpy array
+
+        Returns:
+            an integer representing the beginning of the offset of the array location
+            in memory.
+
+        '''
         array_id = id(array)
         self._memory_map[array_id] = self._allocator.alloc(array.nbytes)
+        if self._memory_map[array_id] is None:
+            raise RuntimeError("Memory Device: Out of memory")
         return self._memory_map[array_id]
 
 
+    def is_mapped(self, array):
+        ''' is_mapped:
+
+        Will check if the array has been mapped into memory already.
+
+        Args:
+            array: A numpy array
+
+        Returns:
+            A boolean response indicating if the array is mapped into memory.
+        '''
+        return id(array) in self._memory_map
+
     def lookup(self, array):
+        ''' lookup:
+
+        Fetches the offset in memory for the requested array.
+
+        Notes:
+            If the array was never mapped, a ValueError is raised.
+
+        Args:
+            array: A numpy array
+
+        Returns:
+            An integer representing the array's offset into memory.
+        '''
         array_id = id(array)
         if array_id not in self._memory_map:
             raise ValueError("Array was not mapped into memory.")
@@ -33,6 +78,8 @@ class MemoryMapper:
 
 
     def unmap(self, array):
+        '''
+        '''
         array_id = id(array)
         if array_id not in self._memory_map:
             raise ValueError("Array was not mapped into memory.")

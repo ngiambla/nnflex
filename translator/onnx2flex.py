@@ -8,6 +8,8 @@ from onnx import numpy_helper, helper, shape_inference, TensorProto
 import numpy as np
 
 
+from operators import *
+
 
 class ONNX2Flex:
     '''
@@ -100,7 +102,7 @@ class ONNX2Flex:
         for ins in node.input:
             if ins not in self._tensors:
                 raise RuntimeError("Could not find input ("+ins+") for node: "+str(node.name))
-            inputs.append(ins)
+            inputs.append(self._tensors[ins])
 
         return inputs
 
@@ -111,7 +113,7 @@ class ONNX2Flex:
         for outs in node.output:
             if outs not in self._tensors:
                 raise RuntimeError("Could not find input ("+outs+") for node: "+str(node.name))
-            outputs.append(outs)
+            outputs.append(self._tensors[outs])
 
         return outputs
 
@@ -135,71 +137,46 @@ class ONNX2Flex:
         outputs = self.get_outputs_of_node(node)
 
 
-        #flexnode = self._create_flexnode(node, inputs)
-
-    # // onnx allows (or at least some tools create) nodes without names
-    # // create unique names for those, e.g. "anonymous_5_relu"
-    # if( n->onnx_name == "" ) {
-    #     std::string name = "anonymous_";
-    #     name += n->op_name;
-    #     name +=  "_" + std::to_string(anonymous_nodes);
-    #     n->onnx_name = name;
-    #     anonymous_nodes++;
-    # }
-
-
-        # TODO DONT FORGET
-        # map the new FlexNode here.
-        self._nodes[node.name] = None
-
-
-    # // onnx allows (or at least some tools create) nodes without names
-    # // create unique names for those, e.g. "anonymous_5_relu"
-    # if( n->onnx_name == "" ) {
-    #     std::string name = "anonymous_";
-    #     name += n->op_name;
-    #     name +=  "_" + std::to_string(anonymous_nodes);
-    #     n->onnx_name = name;
-    #     anonymous_nodes++;
-    # }
-
-    # if( node.attribute_size() != 0 )
-    #     n->parseAttributes( node );
+        flexnode = self._create_flexnode(node, inputs, outputs)
+        if flexnode is not None:
+            print(flexnode.compile(None,None))
+        self._nodes[node.name] = flexnode
 
 
 
-    def _create_flexnode(self, node, inputs):
+    def _create_flexnode(self, node, inputs, outputs):
         '''
         '''
-        op_type = node.op_type();
+        op_type = node.op_type;
 
-        # if op_type == "Abs" : return ElementWise(node, inputs, "Abs")
-        # if op_type == "Add" : return ElementWise(node, inputs, "Add")
-        # if op_type == "AveragePool" : return AveragePool(node, inputs)
-        # if op_type == "BatchNormalization" : return BatchNormalization(node, inputs)
-        # if op_type == "Ceil" : return ElementWise(node, input, "Ceil")
-        # if op_type == "Concat" : return Concat(node, inputs)
-        # if op_type == "Constant" : return Constant(node, inputs)
-        # if op_type == "Conv" : return Conv(node, inputs)
-        # if op_type == "ConvInteger" : return ConvInteger(node, inputs)
-        # if op_type == "Div" : return Arithmetic(node, inputs, "Div")
-        # if op_type == "Dropout" : return Dropout(node, inputs)
-        # if op_type == "DynamicQuantizeLinear" : return DynamicQuantizeLinear(node, inputs)
-        # if op_type == "Flatten" : return Flatten(node, inputs)
-        # if op_type == "Floor" : return Elementwise(node, inputs, "Floor")
-        # if op_type == "GlobalAveragePool" : return GlobalAveragePool(node, inputs)
-        # if op_type == "Gemm" : return GEMM(node, inputs)
-        # if op_type == "LSTM" :return LSTM(node, inputs)
-        # if op_type == "MatMul" : return MatMul(node, inputs)
-        # if op_type == "MatMulInteger" : return MatMulInteger(node, inputs)
-        # if op_type == "MaxPool" : return MaxPool(node, inputs)
-        # if op_type == "Mul" : return Arithmetic(nodes, inputs, "Mul")
-        # if op_type == "Relu" : return ReLu(node, inputs)
-        # if op_type == "Reshape" : return Reshape(node, inputs)
-        # if op_type == "Sigmoid" : return Sigmoid(node, inputs)
-        # if op_type == "Squeeze" : return Squeeze(node, inputs)
-        # if op_type == "Softmax" : return Softmax(node, inputs)
-        # if op_type == "Transpose" : return Transpose(node, inputs)
-        # if op_type == "Unsqueeze" : return Unsqueeze(node, inputs)
+        # if op_type == "Abs" : return ElementWise(node, inputs, outputs, "Abs")
+        # if op_type == "Add" : return ElementWise(node, inputs, outputs, "Add")
+        # if op_type == "AveragePool" : return AveragePool(node, inputs, outputs)
+        # if op_type == "BatchNormalization" : return BatchNormalization(node, inputs, outputs)
+        # if op_type == "Ceil" : return ElementWise(node, inputs, outputs, "Ceil")
+        # if op_type == "Concat" : return Concat(node, inputs, outputs)
+        # if op_type == "Constant" : return Constant(node, inputs, outputs)
+        # if op_type == "Conv" : return Conv(node, inputs, outputs)
+        # if op_type == "ConvInteger" : return ConvInteger(node, inputs, outputs)
+        # if op_type == "Div" : return Arithmetic(node, inputs, outputs, "Div")
+        # if op_type == "Dropout" : return Dropout(node, inputs, outputs)
+        # if op_type == "DynamicQuantizeLinear" : return DynamicQuantizeLinear(node, inputs, outputs)
+        # if op_type == "Flatten" : return Flatten(node, inputs, outputs)
+        # if op_type == "Floor" : return Elementwise(node, inputs, outputs, "Floor")
+        # if op_type == "GlobalAveragePool" : return GlobalAveragePool(node, inputs, outputs)
+        if op_type == "Gemm" : return GeMM(node, inputs, outputs)
+        # if op_type == "LSTM" :return LSTM(node, inputs, outputs)
+        # if op_type == "MatMul" : return MatMul(node, inputs, outputs)
+        # if op_type == "MatMulInteger" : return MatMulInteger(node, inputs, outputs)
+        # if op_type == "MaxPool" : return MaxPool(node, inputs, outputs)
+        # if op_type == "Mul" : return Arithmetic(nodes, inputs, outputs, "Mul")
+        if op_type == "Relu" : return ReLU(node, inputs, outputs)
+        # if op_type == "Reshape" : return Reshape(node, inputs, outputs)
+        # if op_type == "Sigmoid" : return Sigmoid(node, inputs, outputs)
+        # if op_type == "Squeeze" : return Squeeze(node, inputs, outputs)
+        # if op_type == "Softmax" : return Softmax(node, inputs, outputs)
+        # if op_type == "Transpose" : return Transpose(node, inputs, outputs)
+        # if op_type == "Unsqueeze" : return Unsqueeze(node, inputs, outputs)
+        return None
 
-        raise NotImplementedError("Operation is not implemented: "+str(op_type))
+#        raise NotImplementedError("Operation is not implemented: "+str(op_type))
