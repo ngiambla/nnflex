@@ -6,7 +6,7 @@ Tests for the MessageRouter object
 import pytest
 
 from core.device import Device
-from core.message import Message
+from core.messaging import Message
 from core.message_router import MessageRouter
 from core.clock import Clock, ClockReference
 
@@ -37,7 +37,7 @@ def test_message_router_send(queue_size):
 	sender = Device(clock_ref, msg_router)
 	receiver = Device(clock_ref, msg_router, queue_size)
 	
-	msg = Message(sender, receiver)
+	msg = Message(sender, receiver, Message.Ping)
 	for i in range(0, queue_size):
 		assert msg_router.send(msg)
 	assert not msg_router.send(msg)
@@ -52,7 +52,7 @@ def test_message_router_send_and_fetch(queue_size):
 	sender = Device(clock_ref, msg_router)
 	receiver = Device(clock_ref, msg_router, queue_size)
 	
-	msg = Message(sender, receiver)
+	msg = Message(sender, receiver,  Message.Ping)
 	for i in range(0, queue_size):
 		assert msg_router.send(msg)
 	assert not msg_router.send(msg)

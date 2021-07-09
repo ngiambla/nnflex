@@ -6,8 +6,17 @@ from core.clock import ClockReference
 from core.message_router import MessageRouter
 
 class Device:
-    '''
+    ''' Device:
 
+    A base class that all accelerator components inherit from.
+    A device requires a clock-reference and a message-router (to communicate)
+
+    Args:
+        system_clock_ref: a ClockReference object, should be from the System.
+        message_router: a MessageRouter object; this Router should have connections to 
+                        other Devices with which THIS device needs to communicate with.
+        message_queue_size: Implements a FIFO on the MessageRouter port for this device to 
+                            save messages (if the device is busy and cannot accept a message)
     '''
     def __init__(self, system_clock_ref, message_router, message_queue_size = 1):
 

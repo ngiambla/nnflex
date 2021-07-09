@@ -43,17 +43,19 @@ class Arithmetic(FlexNode):
 		self._in1_offset = memory_mapper.map(self._in1_flat)
 		self._in2_offset = memory_mapper.map(self._in2_flat)
 		self._out_offset = memory_mapper.map(self._out_flat)
+        self._inputs2mem(memory_mapper)
 
-	def unmap(self, memory_mapper):
+    def unmap(self, memory_mapper):
+        self._mem2output(memory_mapper)
 		memory_mapper.unmap(self._in1_flat)
 		memory_mapper.unmap(self._in2_flat)
 		memory_mapper.unmap(self._out_flat)
 
-	def inputs2mem(self, memory_xfer_engine):
+	def _inputs2mem(self, memory_xfer_engine):
 		memory_xfer_engine.sys2mem(self._in1_flat, self._in1_offset)
 		memory_xfer_engine.sys2mem(self._in2_flat, self._in2_offset)
 
-	def mem2output(self, memory_xfer_engine):
+	def _mem2output(self, memory_xfer_engine):
 		memory_xfer_engine.mem2sys(self._out_flat, self._out_offset)
 		for i in range(len(self._out_flat)):
 			multi_index = self.unravel_index(i, self._outputs[0].shape)
@@ -66,7 +68,7 @@ class Arithmetic(FlexNode):
 		tile_commands = list()
         num_destinations = len(destinations)
         which_dest = 0
-        
+
 		for i in range(len(self._length)):
             op1_addr = self._in1_offset+i
             op2_addr = self._in2_offset+i

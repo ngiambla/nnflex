@@ -66,6 +66,9 @@ class BitAlloc():
 
 
     def show_map(self):
+        '''
+         Displays the bitmap as a string.
+        '''
         bitmap_string = ""
         for cell in self._bitmap:
             bitmap_string += '{0:08X}'.format(cell)

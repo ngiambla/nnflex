@@ -32,10 +32,10 @@ class Reshape(FlexNode):
     def unmap(self, memory_mapper):
         pass
 
-    def inputs2mem(self, memory_xfer_engine):
+    def _inputs2mem(self, memory_xfer_engine):
         pass
 
-    def mem2output(self, memory_xfer_engine):
+    def _mem2output(self, memory_xfer_engine):
         pass
 
     def compile(self, source, destinations):

@@ -124,10 +124,10 @@ class Memory(Device):
 
         with open("misc_transactions.trc", "w+") as f:
             for transaction in self._transaction_log:
-                print(transaction)
                 f.write(transaction+"\n")
 
-        subprocess.run(["dramsim2/./DRAMSim","-t misc_transactions.trc", "-s dramsim2/system.ini.example", "-d dramsim2/ini/DDR3_micron_64M_8B_x4_sg15.ini"])
+        # TODO: Look into an automatic run and parse of this.
+        #subprocess.run(["dramsim2/./DRAMSim","-t misc_transactions.trc", "-s dramsim2/system.ini.example", "-d dramsim2/ini/DDR3_micron_64M_8B_x4_sg15.ini"])
 
     def size(self):
         return self._width*self._word_byte_size

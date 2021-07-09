@@ -21,9 +21,3 @@ class Operator(Enum):
     MAX = 7
     MIN = 8
     DOT = 9
-
-
-
-
-def float_to_hex(f):
-    return hex(struct.unpack('<I', struct.pack('<f', f))[0])

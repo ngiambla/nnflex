@@ -11,17 +11,15 @@ from core.messaging import Message
 
 class ReadStage(Enum):
     READ_I = 1
-    READ_II = 2
-    READ_DONE = 3
-    READ_SEND = 4
-    WAIT = 5
+    READ_DONE = 2
+    READ_SEND = 3
+    WAIT = 4
 
 class WriteStage(Enum):
     WRITE_I = 1
-    WRITE_II = 2
-    WRITE_DONE = 3
-    WRITE_SEND = 4
-    WAIT = 5
+    WRITE_DONE = 2
+    WRITE_SEND = 3
+    WAIT = 4
 
 
 class NioMemory(Memory):
@@ -58,7 +56,9 @@ class NioMemory(Memory):
         self._message_size = 1
 
     def process(self):
-
+        '''
+        
+        '''
         self._load_messages_from_message_router()
         self._process_write()
         self._process_read()
@@ -67,9 +67,6 @@ class NioMemory(Memory):
         self._current_write_stage = self._next_write_stage
 
         if self._current_write_stage == WriteStage.WRITE_I:
-            self._next_write_stage = WriteStage.WRITE_II
-
-        if self._current_write_stage == WriteStage.WRITE_II:
             self._next_write_stage = WriteStage.WRITE_DONE
 
         if self._current_write_stage == WriteStage.WRITE_DONE:
@@ -106,9 +103,6 @@ class NioMemory(Memory):
         self._current_read_stage = self._next_read_stage
 
         if self._current_read_stage == ReadStage.READ_I:
-            self._next_read_stage = ReadStage.READ_II
-
-        if self._current_read_stage == ReadStage.READ_II:
             self._next_read_stage = ReadStage.READ_DONE
 
         if self._current_read_stage == ReadStage.READ_DONE:

@@ -27,7 +27,7 @@ class Message:
     PEDone = 5
     TileCmd = 6
     TileDone = 7
-
+    Ping = 8
 
     def __init__(self, source, destination, mtype, message_id = None, seq_num = None, attributes = None):
         self.source = source
@@ -42,7 +42,7 @@ class Message:
 
         self.mtype = mtype
 
-        self._supported_types = {self.MemWrite, self.MemWriteDone, self.MemRead, self.MemReadDone, self.PECmd, self.PEDone, self.TileCmd, self.TileDone}
+        self._supported_types = {self.MemWrite, self.MemWriteDone, self.MemRead, self.MemReadDone, self.PECmd, self.PEDone, self.TileCmd, self.TileDone, self.Ping}
 
         # If a keyword argument dictionary was supplied, set this object's attributes. 
         if attributes is not None:

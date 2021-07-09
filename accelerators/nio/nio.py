@@ -1,6 +1,7 @@
 ''' Nick G.'s Accelerator Example 
 
 '''
+import time
 
 from enum import Enum
 
@@ -44,38 +45,56 @@ class Nio(System):
         self._num_tile_cols = num_tile_cols
         # Create the tiles.
         # NOTE: This architecture has PEs connecting 1 another.
-        self._tiles = [[NioTile(self._system_clock_ref, self._device_message_router, 2, self._tile_message_router, self._memory, 4, 4)]*self._num_tile_cols for i in range(self._num_tile_rows)]
+        self._tiles = [[NioTile(self._system_clock_ref, self._device_message_router, 2, self._tile_message_router, self._memory, 1, 1)]*self._num_tile_cols for i in range(self._num_tile_rows)]
 
         self._tiles_flat = flatten(self._tiles)
-        # Define Tile Packet Vars.
-        # For each Message we send to a tile, 
-        # stamp it so it has an ID (we are going to track
-        # responses from a tile.
-        self._message_stamp = 0
-        # Hold a list (queue) of tile commands to send
+        # Define Tile Packet Variables:
+        # 1. Hold a list (queue) of tile commands to send
         self._tile_commands = list()
-        # Hold onto a set representing required responses
+        # 2. Hold onto a set representing required responses
         self._tile_required_resp = set()
         self._tile_resp_messages = list()
+  
+        # Tracks the last cycles required per layer.
+        self._cycles_per_layer = 0
+        # Hold onto the name of the layer we are processing (only needed for CLI)
+        self._current_layer_name = ""
+
+        self._layer_progress = 0
+        self._tile_cmds_per_layer = 0
+        self._real_start = None
 
 
 
     def forward(self, flexnode):
+        ''' forward:
+
+        Conducts the forward pass for the provided flexnode and this architecture.
+
         '''
-        '''
+        # Capture the name of the layer we are processing (only for UI)
+        self._current_layer_name = flexnode.get_op_name()
+        # Record the cycle-count prior to the forward pass
+        self._cycles_per_layer = self._system_clock_ref.current_clock()
+
+        # Record the actual time (identify the simulator's cycles/sec)
+        start_time = time.time()
+        if self._real_start is None:
+            self._real_start = start_time
+
+        # Map the node's input and outputs to memory.
         flexnode.map(self._memory_mapper)
-        flexnode.inputs2mem(self._memory_mapper)
-
-        tile_row_idx = 0
-        tile_col_idx = 0
-
-
-                
-        tile_row_idx = (tile_row_idx+1) % self._num_tile_rows
-        if tile_row_idx == 0:
-            tile_col_idx = (tile_col_idx+1) % self._num_tile_cols
 
         self._tile_commands = flexnode.compile(self, self._tiles_flat)
+
+        # Set the layer progress.
+        self._tile_cmds_per_layer = len(self._tile_commands)
+        if self._tile_cmds_per_layer == 0:
+            self._tile_cmds_per_layer = 1
+            self._layer_progress = 1
+            self.progress()
+
+        self._layer_progress = 0
 
         while self._tile_commands or self._tile_required_resp:
             self._fetch_tile_resp_messages()
@@ -92,39 +111,52 @@ class Nio(System):
                     self._tile_required_resp.add(tile_message.message_id)
                     self._tile_commands[i] = None
 
+            self.progress()
             self.process()
 
             if sent_command_count == (len(self._tile_commands)):
                 self._tile_commands = list()
 
-        flexnode.mem2output(self._memory_mapper)
-        flexnode.unmap(self._memory_mapper)
 
-        print("\nTotal Number of Cycles: "+str(self._system_clock_ref.current_clock()))
+        flexnode.unmap(self._memory_mapper)
+        end_time = time.time()
+
+        self._cycles_per_layer = self._system_clock_ref.current_clock() - self._cycles_per_layer
+        print("\nCycles For Layer ["+flexnode.get_op_name()+"]: " + str(self._cycles_per_layer))
+        print("Total Number of Cycles: " + str(self._system_clock_ref.current_clock()))
+        print("Simulator Performance Per Layer: "+"{:10.2f} cycles/sec".format(self._cycles_per_layer/(end_time-start_time)))
 
         # If the memory was listed as external, this will
-        # self._memory.write_transaction_log()
+        self._memory.write_transaction_log()
+
+    def progress(self):
+        # Define local variable.
+        bar_size = 25
+
+        # Display a progress bar for the user.
+        progress_header = "\r[" + self._current_layer_name + "] Running: "
+        progress = " "*bar_size
+        dot_index = self._system_clock_ref.current_clock() % bar_size
+        progress = progress[:dot_index] + "." + progress[dot_index+1:]
+        percentage = " {:5.2f}% Complete".format(100*self._layer_progress/self._tile_cmds_per_layer)
+        print(progress_header+progress+percentage, end = "")
 
 
     def process(self):
-        '''
+        ''' process:
+
+        For the current clock cycle, process all state changes and required updates for the
+        entire system (System -> Memory -> Tiles -> PEs)
         '''
         self.tick()
 
-        # Literally means to do an action in the clock cycle.
+        # Process the memory for this clock cycle.
         self._memory.process()
-        if self._system_clock_ref.current_clock() % 3 == 0:
-            print("\rRunning: .  ", end="")
-        if self._system_clock_ref.current_clock() % 3 == 1:
-            print("\rRunning: .. ", end="")
-        if self._system_clock_ref.current_clock() % 3 == 2:
-            print("\rRunning: ...", end="")
-
-
+        
+        # For each tile, process their states in this clock cycle.
         for i in range(self._num_tile_rows):
             for j in range(self._num_tile_cols):
                 self._tiles[i][j].process()
-
 
 
 
@@ -140,11 +172,10 @@ class Nio(System):
         for i in range(len(self._tile_resp_messages)):
             message = self._tile_resp_messages[i]
             self._tile_required_resp.remove(message.message_id)
+            self._layer_progress += 1
             messages_to_remove.append(i)
 
         for message_idx in messages_to_remove:
             self._tile_resp_messages.pop(message_idx)
-
-
 
 

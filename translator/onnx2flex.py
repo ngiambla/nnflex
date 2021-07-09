@@ -12,7 +12,20 @@ from operators import *
 
 
 class ONNX2Flex:
-    '''
+    ''' ONNX2Flex
+    This class provides an abstraction to map ONNX data-structures into our simulator
+    frameworks.
+
+    This is an important abstraction: this interfaces acts as a compiler, and compiles
+    all layers of a model into rudimentary operations, intended for a specific hardware device.
+
+    Args:
+        onnx_model_path: a string representing the path to the ONNX mode.
+        verbose: a boolean flag indicating if we should output additonal debug messages.
+        check_model: a boolean flag to ask ONNX if the ONNX model is correct and valid.
+
+    Returns:
+        an ONNX2Flex object.
     '''
     def __init__(self, onnx_model_path, verbose = False, check_model = False):
         if check_model:
@@ -23,11 +36,9 @@ class ONNX2Flex:
         self._ir_version = self._onnx_model.ir_version
 
         self._compute_graph = None
-        self._user_inputs = list()
         
         self._tensors = dict()
         self._nodes = dict()
-        self._inputs_for_node = dict()
         self._node_outputs = dict()
 
         self._verbose = False
@@ -37,12 +48,19 @@ class ONNX2Flex:
         self._node_iter = 0
         self._node_list = list()
 
+    def get_input(self):
+        for ins in self._onnx_model.graph.input:
+            return self._tensors[ins.name]
+
+    def get_output(self):
+        for outs in self._onnx_model.graph.output:
+            return self._tensors[outs.name]        
+
     def next_layer(self):
         if self._node_iter >= len(self._node_list):
             return None
         index = self._node_iter
         self._node_iter += 1
-        print(self._node_list[index].get_op_name())
         return self._node_list[index]
 
 
@@ -52,6 +70,7 @@ class ONNX2Flex:
             custom NN handler
 
         '''
+        print("Translating ONNX Model to FlexNodes:")
         model = self._onnx_model
         for initializer in model.graph.initializer:
             self._tensors[initializer.name] = numpy_helper.to_array(initializer)
@@ -64,8 +83,6 @@ class ONNX2Flex:
 
         for layer_outs in model.graph.value_info:
             self._tensors[layer_outs.name] = self._generate_io_tensor(layer_outs)
-
-        print(self._tensors.keys())
 
         for node in model.graph.node:
             self._translate_node(node)
@@ -142,16 +159,16 @@ class ONNX2Flex:
         if node.name in self._nodes:
             raise RuntimeError("Node: " + node.name + " was already translated.")
 
-        print("Translating: "+node.name)
+        print("\tTranslating: "+node.name)
 
-        print(node)
+        if self._verbose:
+            print(node)
+
         inputs = self.get_inputs_to_node(node)
         outputs = self.get_outputs_of_node(node)
 
 
         flexnode = self._create_flexnode(node, inputs, outputs)
-        # if flexnode is not None:
-        #     print(flexnode.compile(None,None))
         self._nodes[node.name] = flexnode
         self._node_list.append(flexnode)
 
@@ -159,9 +176,21 @@ class ONNX2Flex:
 
     def _create_flexnode(self, node, inputs, outputs):
         '''
+        Creates a flexnode, which will be used to "compile" a layer into 
+        rudimentary operations (suitable for an accelerator).
+
+        This could be customized, and should be explored. 
+
+        In the future, I would recommend to specialize these alongside an accelerator.
+
+        Args:
+            node: ONNX Node
+            inputs: Inputs to the ONNX Node
+            outputs: Outputs of the ONNX Node
         '''
         op_type = node.op_type;
 
+        # Commented code is TODO.
         # if op_type == "Abs" : return ElementWise(node, inputs, outputs, "Abs")
         # if op_type == "Add" : return ElementWise(node, inputs, outputs, "Add")
         # if op_type == "AveragePool" : return AveragePool(node, inputs, outputs)
@@ -190,5 +219,4 @@ class ONNX2Flex:
         # if op_type == "Softmax" : return Softmax(node, inputs, outputs)
         # if op_type == "Transpose" : return Transpose(node, inputs, outputs)
         # if op_type == "Unsqueeze" : return Unsqueeze(node, inputs, outputs)
-        # return None
         raise NotImplementedError("Operation is not implemented: "+str(op_type))

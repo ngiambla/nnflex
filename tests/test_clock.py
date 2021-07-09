@@ -30,6 +30,16 @@ def test_clock_clock():
 	assert result
 
 
+def test_clock_reference_no_clock():
+	result = False
+
+	try:
+		clock_ref = ClockReference(None)
+	except ValueError as VE:
+		result = True
+
+	assert result
+
 def test_clock_reference_cannot_clock():
 	result = False
 

@@ -9,8 +9,7 @@ from core.utils import *
 
 class NioPE(PE):
 
-    EXE1 = 1
-    EXE2 = 2
+    EXEC = 1
     DONE = 3
     RESP = 4
     WAIT = 5
@@ -30,13 +29,8 @@ class NioPE(PE):
 
         # State Transitions
 
-        # If we are in EXE1, move to EXE2
-        if self._pipeline_stage == self.EXE1:
-            self._next_stage = self.EXE2
-            return
-
-        # If we are in EXE2, move to DONE
-        if self._pipeline_stage == self.EXE2:
+        # If we are in EXEC, move to DONE
+        if self._pipeline_stage == self.EXEC:
             self._next_stage = self.DONE
             return
 
@@ -94,4 +88,4 @@ class NioPE(PE):
                 return
 
             self._message_to_process = message
-            self._next_stage = self.EXE1
+            self._next_stage = self.EXEC

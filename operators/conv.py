@@ -75,21 +75,23 @@ class Conv(FlexNode):
         self._out_offset = memory_mapper.map(self._out_flat)
         if self._in3_flat is not None:
             self._in3_offset = memory_mapper.map(self._in3_flat)
+        self._inputs2mem(memory_mapper)
 
     def unmap(self, memory_mapper):
+        self._mem2output(memory_mapper)
         memory_mapper.unmap(self._in1_flat)
         memory_mapper.unmap(self._in2_flat)
         memory_mapper.unmap(self._out_flat)
         if self._in3_flat is not None:
             memory_mapper.unmap(self._in3_flat)
 
-    def inputs2mem(self, memory_xfer_engine):
+    def _inputs2mem(self, memory_xfer_engine):
         memory_xfer_engine.sys2mem(self._in1_flat, self._in1_offset)
         memory_xfer_engine.sys2mem(self._in2_flat, self._in2_offset)
         if self._in3_flat is not None:
             memory_xfer_engine.sys2mem(self._in3_flat, self._in3_offset)
 
-    def mem2output(self, memory_xfer_engine):
+    def _mem2output(self, memory_xfer_engine):
         memory_xfer_engine.mem2sys(self._out_flat, self._out_offset)
         for i in range(len(self._out_flat)):
             multi_index = self.unravel_index(i, self._out_shape)
