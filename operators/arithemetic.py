@@ -54,17 +54,19 @@ class Arithmetic(FlexNode):
 		memory_xfer_engine.sys2mem(self._in2_flat, self._in2_offset)
 
 	def mem2output(self, memory_xfer_engine):
-		memory_xfer_engine.transfer_to_memory.mem2sys(self._out_flat, self._out_offset)
+		memory_xfer_engine.mem2sys(self._out_flat, self._out_offset)
 		for i in range(len(self._out_flat)):
 			multi_index = self.unravel_index(i, self._outputs[0].shape)
 			self._outputs[0][multi_index] = self._out_flat[i]
 
-	def compile(self, source, destination):
+	def compile(self, source, destinations):
 		'''
 		'''
 
 		tile_commands = list()
-
+        num_destinations = len(destinations)
+        which_dest = 0
+        
 		for i in range(len(self._length)):
             op1_addr = self._in1_offset+i
             op2_addr = self._in2_offset+i
@@ -76,9 +78,11 @@ class Arithmetic(FlexNode):
                 "operation" : self._operation,
                 "dtype" : self._out_flat.dtype
             }
-
+            destination = destinations[which_dest]
             message_stamp = uuid.uuid4()
             tile_command = Message(source, destination, Message.TileCmd, message_stamp, attributes=attributes)
             tile_commands.append(tile_command)
+            which_dest += 1
+            which_dest = which_dest % num_destinations
 
         return tile_commands

@@ -84,12 +84,12 @@ class GeMM(FlexNode):
             memory_xfer_engine.sys2mem(self._in3_flat, self._in3_offset)
 
     def mem2output(self, memory_xfer_engine):
-        memory_xfer_engine.transfer_to_memory.mem2sys(self._out_flat, self._out_offset)
+        memory_xfer_engine.mem2sys(self._out_flat, self._out_offset)
         for i in range(len(self._out_flat)):
             multi_index = self.unravel_index(i, self._out_shape)
             self._outputs[0][multi_index] = self._out_flat[i]
 
-    def compile(self, source, destination):
+    def compile(self, source, destinations):
         '''
         '''
 
@@ -102,16 +102,28 @@ class GeMM(FlexNode):
         in2_rows = in2_shape[0]
         in2_cols = in2_shape[1]
 
+        num_destinations = len(destinations)
+        which_dest = 0
         for i in range(in1_rows):
             for j in range(in2_cols):
                 row_addrs = list()
                 col_addrs = list()
-                print(i, j)
                 out_idx = self.ravel_multi_index([i,j], out_shape) + self._out_offset
+                destination = destinations[which_dest]
+                attributes = {
+                    "res_addr" : out_idx,
+                    "operation" : Operator.ADD,
+                    "dtype" : self._out_flat.dtype,
+                    "op1" : 0,
+                    "op2" : 0
+                }
+                message_stamp = uuid.uuid4()
+                tile_command = Message(source, destination, Message.TileCmd, message_stamp, attributes=attributes)
+                tile_commands.append(tile_command)
 
                 for k in range(in2_rows):
-                    row_addrs.append(self.ravel_multi_index([i,k], in1_shape)+self._in1_offset)
-                    col_addrs.append(self.ravel_multi_index([k,j], in2_shape)+self._in2_offset)
+                    row_addrs.append(self.ravel_multi_index([i,k], in1_shape) + self._in1_offset)
+                    col_addrs.append(self.ravel_multi_index([k,j], in2_shape) + self._in2_offset)
 
                 attributes = {
                     "res_addr" : out_idx,
@@ -127,5 +139,7 @@ class GeMM(FlexNode):
                 message_stamp = uuid.uuid4()
                 tile_command = Message(source, destination, Message.TileCmd, message_stamp, attributes=attributes)
                 tile_commands.append(tile_command)
+                which_dest += 1
+                which_dest = which_dest % num_destinations
 
         return tile_commands

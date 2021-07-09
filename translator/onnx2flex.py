@@ -34,6 +34,18 @@ class ONNX2Flex:
 
         self._anon_nodes = None
 
+        self._node_iter = 0
+        self._node_list = list()
+
+    def next_layer(self):
+        if self._node_iter >= len(self._node_list):
+            return None
+        index = self._node_iter
+        self._node_iter += 1
+        print(self._node_list[index].get_op_name())
+        return self._node_list[index]
+
+
     def translate(self):
         ''' translate:
             Translates the model from ONNX to NNFlex's
@@ -132,15 +144,16 @@ class ONNX2Flex:
 
         print("Translating: "+node.name)
 
-
+        print(node)
         inputs = self.get_inputs_to_node(node)
         outputs = self.get_outputs_of_node(node)
 
 
         flexnode = self._create_flexnode(node, inputs, outputs)
-        if flexnode is not None:
-            print(flexnode.compile(None,None))
+        # if flexnode is not None:
+        #     print(flexnode.compile(None,None))
         self._nodes[node.name] = flexnode
+        self._node_list.append(flexnode)
 
 
 
@@ -156,7 +169,7 @@ class ONNX2Flex:
         # if op_type == "Ceil" : return ElementWise(node, inputs, outputs, "Ceil")
         # if op_type == "Concat" : return Concat(node, inputs, outputs)
         # if op_type == "Constant" : return Constant(node, inputs, outputs)
-        # if op_type == "Conv" : return Conv(node, inputs, outputs)
+        if op_type == "Conv" : return Conv(node, inputs, outputs)
         # if op_type == "ConvInteger" : return ConvInteger(node, inputs, outputs)
         # if op_type == "Div" : return Arithmetic(node, inputs, outputs, "Div")
         # if op_type == "Dropout" : return Dropout(node, inputs, outputs)
@@ -171,12 +184,11 @@ class ONNX2Flex:
         # if op_type == "MaxPool" : return MaxPool(node, inputs, outputs)
         # if op_type == "Mul" : return Arithmetic(nodes, inputs, outputs, "Mul")
         if op_type == "Relu" : return ReLU(node, inputs, outputs)
-        # if op_type == "Reshape" : return Reshape(node, inputs, outputs)
+        if op_type == "Reshape" : return Reshape(node, inputs, outputs)
         # if op_type == "Sigmoid" : return Sigmoid(node, inputs, outputs)
         # if op_type == "Squeeze" : return Squeeze(node, inputs, outputs)
         # if op_type == "Softmax" : return Softmax(node, inputs, outputs)
         # if op_type == "Transpose" : return Transpose(node, inputs, outputs)
         # if op_type == "Unsqueeze" : return Unsqueeze(node, inputs, outputs)
-        return None
-
-#        raise NotImplementedError("Operation is not implemented: "+str(op_type))
+        # return None
+        raise NotImplementedError("Operation is not implemented: "+str(op_type))

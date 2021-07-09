@@ -91,15 +91,15 @@ class MessageRouter:
             True if the transmisson was successful, False if the router-queue for the device is full.
             If False is returned, the source device should stall on sending!
         '''
-        if message.destination_device() not in self._message_queue_map:
-            raise ValueError("Requested Destination is not on this MessageRouter."+str(message.destination_device()))
+        if message.destination not in self._message_queue_map:
+            raise ValueError("Requested Destination is not on this MessageRouter."+str(message.destination))
 
         if not isinstance(message, Message):
             raise ValueError("Cannot send a non-Message on a MessageRouter.")
 
-        message.stamp_time_sent(self._system_clock_ref.current_clock())
+        message.sent_clock = self._system_clock_ref.current_clock()
 
-        return self._message_queue_map[message.destination_device()].queue(message)
+        return self._message_queue_map[message.destination].queue(message)
 
 
     def fetch(self, requestor):
@@ -119,6 +119,6 @@ class MessageRouter:
         message = self._message_queue_map[requestor].dequeue()
         if message is not None:
             # Stamp the message, now that it's been received.
-            message.stamp_time_received(self._system_clock_ref.current_clock())
+            message.recv_clock = self._system_clock_ref.current_clock()
         return message
 

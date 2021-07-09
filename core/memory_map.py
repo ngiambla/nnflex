@@ -7,7 +7,9 @@ Date: June 16, 2021
 
 '''
 import numpy
+import struct
 from core.allocator import BitAlloc
+from core.utils import *
 
 
 class MemoryMapper:
@@ -15,7 +17,8 @@ class MemoryMapper:
     Using BitAlloc from core.allocator (any allocator would suffice),
     We map a numpy array to memory via .nditer
     '''
-    def __init__(self, memory_size, word_size):
+    def __init__(self, memory_system, memory_size, word_size):
+        self._memory_system = memory_system
         self._memory_map = dict()
         self._allocator = BitAlloc(memory_size, word_size)
 
@@ -88,4 +91,16 @@ class MemoryMapper:
         self._allocator.free(addr)
         del self._memory_map[array_id]
 
-        
+
+    def sys2mem(self, arr, offset):
+        '''
+        '''
+        for i in range(len(arr)):
+            data = float_to_int_repr_of_float(arr[i])
+            self._memory_system._poke(i+offset, data)
+
+    def mem2sys(self, arr, offset):
+        for i in range(len(arr)):
+            arr[i] = int_repr_of_float_to_float(self._memory_system._peek(i+offset))
+
+

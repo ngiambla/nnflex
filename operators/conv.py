@@ -3,6 +3,7 @@
 Implement's the conv ONNX node as a flexnode (for use with any accelerator)
 
 '''
+import itertools
 import uuid
 
 import numpy as np
@@ -30,6 +31,7 @@ class Conv(FlexNode):
         self._in1_flat = in1.flatten()
 
         in2 = self._inputs[1]
+        self._in2_shape = in2.shape
         self._in2_flat = in2.flatten()
         
 
@@ -88,47 +90,84 @@ class Conv(FlexNode):
             memory_xfer_engine.sys2mem(self._in3_flat, self._in3_offset)
 
     def mem2output(self, memory_xfer_engine):
-        memory_xfer_engine.transfer_to_memory.mem2sys(self._out_flat, self._out_offset)
+        memory_xfer_engine.mem2sys(self._out_flat, self._out_offset)
         for i in range(len(self._out_flat)):
             multi_index = self.unravel_index(i, self._out_shape)
             self._outputs[0][multi_index] = self._out_flat[i]
 
-    def compile(self, source, destination):
-        '''
-        '''
+
+    def compile(self, source, destinations):
 
         tile_commands = list()
+
+        batch_size = self._in1_shape[0]
+        num_channels = self._in1_shape[1]
+        num_feature_maps = self._in2_shape[0]
         out_shape = self._out_shape
-        in1_shape = self._in1_shape
-        in2_shape = self._in2_shape
 
-        batches = out_shape[0]
-        
-        num_cols_out = out_shape[1]
+        num_destinations = len(destinations)
+        which_dest = 0
 
-        for i in range(num_rows_out):
-            for j in range(num_cols_out):
-                row_addrs = list()
-                col_addrs = list()
-                out_idx = self.ravel_multi_index([i,j], out_shape) + self._out_offset
+        for b in range(batch_size):
+            for m in range(num_feature_maps):
+                o0 = 0
+                i0 = 0
+                while o0 < self._out_shape[2]:
 
-                for k in range(num_cols_out):
-                    row_addrs.append(self.ravel_multi_index([i,k], in1_shape)+self._in1_offset)
-                    col_addrs.append(self.ravel_multi_index([k,j], in2_shape)+self._in2_offset)
+                    o1 = 0
+                    i1 = 0 
+                    while o1 < self._out_shape[3]:
+                        in_addrs = list()
+                        wt_addrs = list()
+                        destination = destinations[which_dest]
 
-                attributes = {
-                    "res_addr" : out_idx,
-                    "operation" : Operator.DOT,
-                    "dtype" : self._out_flat.dtype,
-                    "col_addrs" : col_addrs,
-                    "row_addrs" : row_addrs,
-                }
+                        out_idx = self.ravel_multi_index([b, m, o0, o1], out_shape) + self._out_offset
+                        attributes = {
+                            "res_addr" : out_idx,
+                            "operation" : Operator.ADD,
+                            "dtype" : self._out_flat.dtype,
+                            "op1" : 0,
+                            "op2" : 0
+                        }                        
+                        message_stamp = uuid.uuid4()
+                        tile_command = Message(source, destination, Message.TileCmd, message_stamp, attributes=attributes)
+                        tile_commands.append(tile_command)
 
-                if self._in3_flat is not None:
-                    attributes["bias"] = self.ravel_multi_index([i,j], out_shape) + self._in3_offset
+                        for c in range(num_channels):
+                            for kern0 in range(self._kernel_shape[0]):
+                                for kern1 in range(self._kernel_shape[1]):
 
-                message_stamp = uuid.uuid4()
-                tile_command = Message(source, destination, Message.TileCmd, message_stamp, attributes=attributes)
-                tile_commands.append(tile_command)
+                                    ii0 = i0 + kern0 + self._dilations[0] -1 
+                                    if ii0 < 0 or ii0 >= self._in1_shape[2]:
+                                        continue
+                                    ii1 = i1 + kern1 + self._dilations[1] -1 
+                                    if ii0 < 0 or ii0 >= self._in1_shape[3]:
+                                        continue
+
+                                    in_addrs.append(self.ravel_multi_index([b, c, i0+kern0, i1+kern1], self._in1_shape) + self._in1_offset)
+                                    wt_addrs.append(self.ravel_multi_index([m, c, kern0, kern1], self._in2_shape) + self._in2_offset)
+
+                        attributes = {
+                            "res_addr" : out_idx,
+                            "operation" : Operator.DOT,
+                            "dtype" : self._out_flat.dtype,
+                            "col_addrs" : in_addrs,
+                            "row_addrs" : wt_addrs,
+                        }
+
+                        if self._in3_flat is not None:
+                            attributes["bias"] = self.ravel_multi_index([i,j], out_shape) + self._in3_offset
+                        message_stamp = uuid.uuid4()
+                        tile_command = Message(source, destination, Message.TileCmd, message_stamp, attributes=attributes)
+                        tile_commands.append(tile_command)
+
+                        which_dest += 1
+                        which_dest = which_dest % num_destinations
+
+                        i1 += self._strides[1]
+                        o1 += 1
+
+                    i0 += self._strides[0]
+                    o0 += 1
 
         return tile_commands
