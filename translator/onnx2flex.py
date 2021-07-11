@@ -50,7 +50,10 @@ class ONNX2Flex:
 
     def get_input(self):
         for ins in self._onnx_model.graph.input:
-            return self._tensors[ins.name]
+            return ins.name, self._tensors[ins.name]
+
+    def set_input(self, name, tensor):
+        self._tensors[name] = tensor
 
     def get_output(self):
         for outs in self._onnx_model.graph.output:

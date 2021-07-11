@@ -95,7 +95,6 @@ class BitAlloc():
 
         # Force requested bytes to be at least self._factor.
         nbytes = self._factor if num_bytes < self._factor else num_bytes
-
         # Begin Searching the bitmap.
 
         # 1. Compute if we are not within a boundary of self._factor
@@ -130,7 +129,7 @@ class BitAlloc():
             return None
 
         real_bit_mod_res = bitmap_start_bit&(0x1F)
-        map_index = (bitmap_start_bit - real_bit_mod_res)>>6
+        map_index = (bitmap_start_bit - real_bit_mod_res)>>5
         real_bit_mod_res = self._bits_per_block - 1 - real_bit_mod_res
         addr = (bitmap_start_bit << self._shift_factor);
         self._bit_alloc_size_map[bitmap_start_bit] = num_required_bits
@@ -170,7 +169,7 @@ class BitAlloc():
 
         bitmap_start_bit = addr >> self._shift_factor
         real_bit_mod_res = bitmap_start_bit&(0x1F)
-        map_index = (bitmap_start_bit - real_bit_mod_res) >> 6
+        map_index = (bitmap_start_bit - real_bit_mod_res) >> 5
         
         real_bit_mod_res = self._bits_per_block - 1 - real_bit_mod_res
         if bitmap_start_bit not in self._bit_alloc_size_map:

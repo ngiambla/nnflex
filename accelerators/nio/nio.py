@@ -107,7 +107,7 @@ class Nio(System):
                     sent_command_count += 1
                     continue
 
-                if self._tile_message_router.send(tile_message):       
+                if self._tile_message_router.send(tile_message):
                     self._tile_required_resp.add(tile_message.message_id)
                     self._tile_commands[i] = None
 

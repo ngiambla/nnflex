@@ -57,8 +57,8 @@ class ExecStage(Stage):
         if self._message is None:
             return
 
-        op1 = float_to_int_repr_of_float(self._message.op1)
-        op2 = float_to_int_repr_of_float(self._message.op2)
+        op1 = int_repr_of_float_to_float(self._message.op1)
+        op2 = int_repr_of_float_to_float(self._message.op2)
         dest = self._message.source
         message_id = self._message.message_id
         seq_num = self._message.seq_num
@@ -73,6 +73,9 @@ class ExecStage(Stage):
             result = op1*op2
         elif operator == Operator.DIV:
             result = op1/op2
+        elif operator == Operator.CMAC:
+            self._accumulator = op1*op2
+            result = self._accumulator
         elif operator == Operator.MAC:
             self._accumulator += op1*op2
             result = self._accumulator
@@ -83,9 +86,9 @@ class ExecStage(Stage):
             result = int(max(op1, op2))
         elif operator == Operator.MIN:
             result = int(min(op1, op2))
-        print(result)
+
         attributes = {
-            "result" : int_repr_of_float_to_float(result)
+            "result" : float_to_int_repr_of_float(result)
         }
         self._message = Message(self._nio_pe, dest, Message.PEDone, message_id, seq_num, attributes = attributes)
 

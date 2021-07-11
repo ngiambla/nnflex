@@ -41,12 +41,13 @@ class NioPE(PE):
         if self._pipeline_stage == self.DONE:
             # Currently, we are ONLY forming a PEResponse message
             # print(self._message_to_process.operation)
-            op1 = float_to_int_repr_of_float(self._message_to_process.op1)
-            op2 = float_to_int_repr_of_float(self._message_to_process.op2)
+            op1 = int_repr_of_float_to_float(self._message_to_process.op1)
+            op2 = int_repr_of_float_to_float(self._message_to_process.op2)
             dest = self._message_to_process.source
             message_id = self._message_to_process.message_id
             seq_num = self._message_to_process.seq_num
             operator = self._message_to_process.operation
+
             result = 0
 
             if operator == Operator.ADD:
@@ -57,6 +58,9 @@ class NioPE(PE):
                 result = op1*op2
             elif operator == Operator.DIV:
                 result = op1/op2
+            elif operator == Operator.CMAC:
+                self._accumulator = op1*op2
+                result = self._accumulator
             elif operator == Operator.MAC:
                 self._accumulator += op1*op2
                 result = self._accumulator
@@ -64,12 +68,14 @@ class NioPE(PE):
                 self._accumulator = 0
                 result = self._accumulator
             elif operator == Operator.MAX:
-                result = int(max(op1, op2))
+                result = max(op1, op2)
             elif operator == Operator.MIN:
-                result = int(min(op1, op2))
+                result = min(op1, op2)
+            else:
+                raise NotImplementedError("Requested Operation is not implemented.")
 
             attributes = {
-                "result" : int_repr_of_float_to_float(result)
+                "result" : result
             }
             self._message_to_send = Message(self, dest, Message.PEDone, message_id, seq_num, attributes = attributes)
             self._next_stage = self.RESP

@@ -39,17 +39,27 @@ def configure_accelerator(yaml_config):
         raise Exception("Accelerator not supported.")
 
 
+def train(model, onnx2flex, accelerator):
+    '''
 
-def main():
-    parser = argparse.ArgumentParser(description="NNFlex: A Flexible Neural Network Accelerator Simulation Engine")
-    parser.add_argument('-m','--model', help='The ONNX File representing the Neural Network', required=True)
-    parser.add_argument('-c','--config', help="The YAML file representing the configuation of the accelerator", required=True)
-    args = parser.parse_args()
+    '''
+    raise NotImplementedError("Training is not yet implemented.")
 
-    onnx2flex = ONNX2Flex(args.model)
-    onnx2flex.translate()
-    accelerator = configure_accelerator(args.config)
 
+def inference(model, onnx2flex, accelerator):
+    '''
+    '''
+    # First, fetch the input:
+    name, tensor = onnx2flex.get_input()
+    # Using the size of the input,
+    # create a random tensor.
+    #new_tensor = np.random.random_sample(tensor.shape).astype(tensor.dtype)
+
+    new_tensor = tensor
+
+    # Now, set the input as the random tensor
+    onnx2flex.set_input(name, new_tensor)
+    print("Executing Inference:\n")
 
     layer = onnx2flex.next_layer()
     while layer is not None:
@@ -57,12 +67,35 @@ def main():
         accelerator.forward(layer)
         layer = onnx2flex.next_layer()
 
-    print(prev_layer._outputs)
-    print(onnx2flex.get_output())
-    sess = rt.InferenceSession(args.model)
+    sess = rt.InferenceSession(model)
     input_name = sess.get_inputs()[0].name
-    pred_onx = sess.run(None, {input_name: onnx2flex.get_input()})[0]
-    print(pred_onx)
+    pred_onx = sess.run(None, {input_name: new_tensor})[0]
+
+    if np.allclose(onnx2flex.get_output(), pred_onx):
+        print("NNFlex Matches ONNX Runtime.")
+    else:
+        print("NNFlex Mismatch: Results are not equal with respect to ONNX Runtime")
+        print("ONNX Runtime: " + str(pred_onx))
+        print("NNFlex: " + str(onnx2flex.get_output()))
+
+
+def main():
+    parser = argparse.ArgumentParser(description="NNFlex: A Flexible Neural Network Accelerator Simulation Engine")
+    parser.add_argument('-m','--model', help='The ONNX File representing the Neural Network', required=True)
+    parser.add_argument('-c','--config', help="The YAML file representing the configuation of the accelerator", required=True)
+    parser.add_argument('--train', action='store_true',  default=False, help='Trains the network with the request accelerator (Default: False)')    
+
+    args = parser.parse_args()
+
+    onnx2flex = ONNX2Flex(args.model)
+    onnx2flex.translate()
+    accelerator = configure_accelerator(args.config)
+
+    if args.train:
+        train(args.model, onnx2flex, accelerator)
+    else:
+        inference(args.model, onnx2flex, accelerator)
+
 
 
 if __name__ == "__main__":

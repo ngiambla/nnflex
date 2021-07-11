@@ -37,7 +37,6 @@ class GeMM(FlexNode):
         self._out_shape = out.shape
         self._out_flat = out.flatten()
 
-        in3 = None
         self._in3_flat = None
         if len(self._inputs) == 3:
             in3 = self._beta * np.broadcast_to(self._inputs[2], self._out_shape)
@@ -106,22 +105,21 @@ class GeMM(FlexNode):
 
         num_destinations = len(destinations)
         which_dest = 0
+
+        seen_output = set()
+
         for i in range(in1_rows):
             for j in range(in2_cols):
                 row_addrs = list()
                 col_addrs = list()
                 out_idx = self.ravel_multi_index([i,j], out_shape) + self._out_offset
+
+                if out_idx not in seen_output:
+                    seen_output.add(out_idx)
+                else:
+                    raise ValueError("Seen this output before: "+str(seen_output))                
+
                 destination = destinations[which_dest]
-                attributes = {
-                    "res_addr" : out_idx,
-                    "operation" : Operator.ADD,
-                    "dtype" : self._out_flat.dtype,
-                    "op1" : 0,
-                    "op2" : 0
-                }
-                message_stamp = uuid.uuid4()
-                tile_command = Message(source, destination, Message.TileCmd, message_stamp, attributes=attributes)
-                tile_commands.append(tile_command)
 
                 for k in range(in2_rows):
                     row_addrs.append(self.ravel_multi_index([i,k], in1_shape) + self._in1_offset)
@@ -137,7 +135,6 @@ class GeMM(FlexNode):
 
                 if self._in3_flat is not None:
                     attributes["bias"] = self.ravel_multi_index([i,j], out_shape) + self._in3_offset
-
                 message_stamp = uuid.uuid4()
                 tile_command = Message(source, destination, Message.TileCmd, message_stamp, attributes=attributes)
                 tile_commands.append(tile_command)

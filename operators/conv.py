@@ -39,7 +39,6 @@ class Conv(FlexNode):
         self._out_shape = out.shape
         self._out_flat = out.flatten()
 
-        in3 = None
         self._in3_flat = None
         if len(self._inputs) == 3:
             in3 = np.broadcast_to(self._inputs[2], self._out_shape)
@@ -110,6 +109,8 @@ class Conv(FlexNode):
         num_destinations = len(destinations)
         which_dest = 0
 
+        seen_output = set()
+
         for b in range(batch_size):
             for m in range(num_feature_maps):
                 o0 = 0
@@ -124,16 +125,10 @@ class Conv(FlexNode):
                         destination = destinations[which_dest]
 
                         out_idx = self.ravel_multi_index([b, m, o0, o1], out_shape) + self._out_offset
-                        attributes = {
-                            "res_addr" : out_idx,
-                            "operation" : Operator.ADD,
-                            "dtype" : self._out_flat.dtype,
-                            "op1" : 0,
-                            "op2" : 0
-                        }                        
-                        message_stamp = uuid.uuid4()
-                        tile_command = Message(source, destination, Message.TileCmd, message_stamp, attributes=attributes)
-                        tile_commands.append(tile_command)
+                        if out_idx not in seen_output:
+                            seen_output.add(out_idx)
+                        else:
+                            raise ValueError("Seen this output before: "+str(seen_output))
 
                         for c in range(num_channels):
                             for kern0 in range(self._kernel_shape[0]):

@@ -17,7 +17,8 @@ class Operator(Enum):
     MUL = 3
     DIV = 4
     MAC = 5
-    CLEAR = 6
-    MAX = 7
-    MIN = 8
-    DOT = 9
+    CMAC = 6
+    CLEAR = 7
+    MAX = 8
+    MIN = 9
+    DOT = 10

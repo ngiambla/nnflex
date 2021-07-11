@@ -44,6 +44,9 @@ class NioTile(Tile):
         self._tile_message = None
         self._device_message = None
 
+        # Handle Bias Carefully:
+        self._bias_map = dict()
+
         # For read and writes to memory.
         self._reads_to_send = list()
         self._read_responses = dict()
@@ -72,7 +75,6 @@ class NioTile(Tile):
                 self._pe_grid[i][j].process()    
 
         self._current_stage = self._next_stage
-        # print(str(self._current_stage))
 
         if self._current_stage == self.FETCH:
             msg = self._tile_message
@@ -88,6 +90,7 @@ class NioTile(Tile):
                     }
                     msg_stamp = uuid.uuid4()
                     self._reads_to_send.append(Message(self, self._offchip_memory, Message.MemRead, msg_stamp, 1, attributes=attributes))
+                    self._read_responses[str(msg_stamp)+str(1)] = None
                 else:
                     self._read_responses["1"] = msg.op1
 
@@ -97,6 +100,7 @@ class NioTile(Tile):
                     }                    
                     msg_stamp = uuid.uuid4()
                     self._reads_to_send.append(Message(self, self._offchip_memory, Message.MemRead, msg_stamp, 2, attributes=attributes))
+                    self._read_responses[str(msg_stamp)+str(2)] = None
                 else:
                     self._read_responses["2"] = msg.op2
 
@@ -108,6 +112,8 @@ class NioTile(Tile):
                         "addr" : int(addr)
                     }   
                     self._reads_to_send.append(Message(self, self._offchip_memory, Message.MemRead, msg_stamp, idx, attributes=attributes))
+                    self._read_responses[str(msg_stamp)+str(idx)] = None
+
                     idx+=1
 
                 msg_stamp = uuid.uuid4()                    
@@ -116,14 +122,18 @@ class NioTile(Tile):
                         "addr" : int(addr)
                     }   
                     self._reads_to_send.append(Message(self, self._offchip_memory, Message.MemRead, msg_stamp, idx, attributes=attributes))
+                    self._read_responses[str(msg_stamp)+str(idx)] = None
+
                     idx +=1
 
                 if msg.bias is not None:
                     attributes = {
                         "addr" : int(msg.bias)
                     }   
-                    msg_stamp = uuid.uuid4()                    
+                    msg_stamp = uuid.uuid4()                
                     self._reads_to_send.append(Message(self, self._offchip_memory, Message.MemRead, msg_stamp, idx, attributes=attributes))
+                    self._read_responses[str(msg_stamp)+str(idx)] = None
+
             else:
                 raise ValueError("Unhandled operation during FETCH.")
 
@@ -135,7 +145,9 @@ class NioTile(Tile):
             if self._reads_to_send:
                 message = self._reads_to_send[0]
                 if self._message_router.send(message):
-                    self._read_responses[str(message.message_id)+str(message.seq_num)] = None
+                    msg_identifier = str(message.message_id)+str(message.seq_num)
+                    if msg_identifier not in self._read_responses:
+                        raise ValueError("Memory-Read Mismatch.")
                     self._reads_to_send.pop(0)
 
 
@@ -167,26 +179,31 @@ class NioTile(Tile):
                     self._dispatch_queue.append(Message(self, self._pe_grid[0][0], Message.PECmd, msg_stamp, attributes=attributes))                
 
 
-                elif op in {Operator.DOT}:
-                    msg_stamp = uuid.uuid4()
-                    attributes = {
-                        "operation" : Operator.CLEAR,
-                        "dtype" : msg.dtype,
-                        "op1" : 0,
-                        "op2" : 0
-                        }                    
-                    self._dispatch_queue.append(Message(self, self._pe_grid[0][0], Message.PECmd, msg_stamp, attributes=attributes))                
+                elif op in {Operator.DOT}:              
 
                     values = list(self._read_responses.values())
                     for i in range(len(msg.col_addrs)):
                         msg_stamp = uuid.uuid4()  
                         attributes = {
-                            "operation" : Operator.MAC,
+                            "operation" : Operator.CMAC if i == 0 else Operator.MAC,
                             "dtype" : msg.dtype,
                             "op1" : values[i],
                             "op2" : values[i+len(msg.col_addrs)]
                             }
                         self._dispatch_queue.append(Message(self, self._pe_grid[0][0], Message.PECmd, msg_stamp, attributes=attributes))
+
+        
+                    if msg.bias is not None:
+                        msg_stamp = uuid.uuid4()  
+                        attributes = {
+                            "operation" : Operator.MAC,
+                            "dtype" : msg.dtype,
+                            "op1" : values[-1],
+                            "op2" : float_to_int_repr_of_float(1)
+                            }
+                        self._dispatch_queue.append(Message(self, self._pe_grid[0][0], Message.PECmd, msg_stamp, attributes=attributes))
+                else:
+                    raise NotImplementedError("Unhandled operation: "+str(op))
 
         if self._current_stage == self.DISPATCH_TO_PE:
             self._next_stage = self.DISPATCH_TO_PE
