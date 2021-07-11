@@ -48,12 +48,12 @@ class ONNX2Flex:
         self._node_iter = 0
         self._node_list = list()
 
-    def get_input(self):
+    def get_input_attributes(self):
         for ins in self._onnx_model.graph.input:
-            return ins.name, self._tensors[ins.name]
+            return ins.name, self._tensors[ins.name].shape, self._tensors[ins.name].dtype
 
     def set_input(self, name, tensor):
-        self._tensors[name] = tensor
+        np.copyto(self._tensors[name], tensor)
 
     def get_output(self):
         for outs in self._onnx_model.graph.output:

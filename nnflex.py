@@ -50,15 +50,16 @@ def inference(model, onnx2flex, accelerator):
     '''
     '''
     # First, fetch the input:
-    name, tensor = onnx2flex.get_input()
+    name, shape, dtype = onnx2flex.get_input_attributes()
     # Using the size of the input,
     # create a random tensor.
-    #new_tensor = np.random.random_sample(tensor.shape).astype(tensor.dtype)
+    new_tensor = np.random.random_sample(shape).astype(dtype)
 
-    new_tensor = tensor
+    # new_tensor = tensor
 
     # Now, set the input as the random tensor
     onnx2flex.set_input(name, new_tensor)
+
     print("Executing Inference:\n")
 
     layer = onnx2flex.next_layer()

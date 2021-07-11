@@ -16,16 +16,6 @@ class Reshape(FlexNode):
     def __init__(self, onnx_node, inputs, outputs):
         FlexNode.__init__(self, onnx_node, inputs, outputs)
 
-        in1 = self._inputs[0]
-        in2 = self._inputs[1]
-        out = self._outputs[0]
-
-
-        self._in1_offset = 0
-        self._out_offset = 0
-
-
-
     def map(self, memory_mapper):
         pass
 
@@ -44,6 +34,6 @@ class Reshape(FlexNode):
 
         tile_commands = list()
 
-        self._outputs[0] = self._inputs[0].reshape(tuple(self._inputs[1]))
+        np.copyto(self._outputs[0], self._inputs[0].reshape(tuple(self._inputs[1])))
 
         return tile_commands

@@ -15,15 +15,6 @@ class Arithmetic(FlexNode):
 	def __init__(self, onnx_node, inputs, outputs):
 		FlexNode.__init__(self, onnx_node, inputs, outputs)
 
-		in1 = self._inputs[0]
-		in2 = self._inputs[1]
-		out = self._outputs[0]
-
-		self._in1_flat = in1.flatten()
-		self._in2_flat = in2.flatten()
-		self._out_flat = out.flatten()
-
-		self._length = len(self._in1_flat)
 
 		self._in1_offset = 0
 		self._in2_offset = 0 
@@ -40,6 +31,16 @@ class Arithmetic(FlexNode):
 
 
 	def map(self, memory_mapper):
+		in1 = self._inputs[0]
+		in2 = self._inputs[1]
+		out = self._outputs[0]
+
+		self._in1_flat = in1.flatten()
+		self._in2_flat = in2.flatten()
+		self._out_flat = out.flatten()
+
+		self._length = len(self._in1_flat)
+				
 		self._in1_offset = memory_mapper.map(self._in1_flat)
 		self._in2_offset = memory_mapper.map(self._in2_flat)
 		self._out_offset = memory_mapper.map(self._out_flat)

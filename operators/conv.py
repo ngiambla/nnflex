@@ -26,24 +26,17 @@ class Conv(FlexNode):
 
         self.fill_attributes(onnx_node)
 
-        in1 = self._inputs[0]
-        self._in1_shape = in1.shape
-        self._in1_flat = in1.flatten()
+        self._in1_shape = None
+        self._in1_flat = None
 
-        in2 = self._inputs[1]
-        self._in2_shape = in2.shape
-        self._in2_flat = in2.flatten()
+        self._in2_shape = None
+        self._in2_flat = None 
         
+        self._out_shape = None
+        self._out_flat =  None
 
-        out = self._outputs[0]
-        self._out_shape = out.shape
-        self._out_flat = out.flatten()
-
+        self._in3_shape = None
         self._in3_flat = None
-        if len(self._inputs) == 3:
-            in3 = np.broadcast_to(self._inputs[2], self._out_shape)
-            self._in3_shape = in3.shape
-            self._in3_flat = in3.flatten()
 
         self._in1_offset = 0
         self._in2_offset = 0 
@@ -69,6 +62,24 @@ class Conv(FlexNode):
 
 
     def map(self, memory_mapper):
+
+        in1 = self._inputs[0]
+        self._in1_shape = in1.shape
+        self._in1_flat = in1.flatten()
+
+        in2 = self._inputs[1]
+        self._in2_shape = in2.shape
+        self._in2_flat = in2.flatten()
+
+        out = self._outputs[0]
+        self._out_shape = out.shape
+        self._out_flat = out.flatten()
+
+        if len(self._inputs) == 3:
+            in3 = np.broadcast_to(self._inputs[2], self._out_shape)
+            self._in3_shape = in3.shape
+            self._in3_flat = in3.flatten()
+
         self._in1_offset = memory_mapper.map(self._in1_flat)
         self._in2_offset = memory_mapper.map(self._in2_flat)
         self._out_offset = memory_mapper.map(self._out_flat)
@@ -78,6 +89,7 @@ class Conv(FlexNode):
 
     def unmap(self, memory_mapper):
         self._mem2output(memory_mapper)
+
         memory_mapper.unmap(self._in1_flat)
         memory_mapper.unmap(self._in2_flat)
         memory_mapper.unmap(self._out_flat)
@@ -95,7 +107,6 @@ class Conv(FlexNode):
         for i in range(len(self._out_flat)):
             multi_index = self.unravel_index(i, self._out_shape)
             self._outputs[0][multi_index] = self._out_flat[i]
-
 
     def compile(self, source, destinations):
 
