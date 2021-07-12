@@ -220,6 +220,6 @@ class ONNX2Flex:
         # if op_type == "Sigmoid" : return Sigmoid(node, inputs, outputs)
         # if op_type == "Squeeze" : return Squeeze(node, inputs, outputs)
         # if op_type == "Softmax" : return Softmax(node, inputs, outputs)
-        # if op_type == "Transpose" : return Transpose(node, inputs, outputs)
+        if op_type == "Transpose" : return Transpose(node, inputs, outputs)
         # if op_type == "Unsqueeze" : return Unsqueeze(node, inputs, outputs)
         raise NotImplementedError("Operation is not implemented: "+str(op_type))

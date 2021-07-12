@@ -1,4 +1,4 @@
-''' rely.py:
+''' relu.py:
 
 Implement's the ReLU ONNX node as a flexnode (for use with any accelerator)
 

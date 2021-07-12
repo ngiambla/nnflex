@@ -5,4 +5,5 @@ from operators.relu import ReLU
 from operators.gemm import GeMM
 from operators.flexnode import FlexNode
 from operators.reshape import Reshape
+from operators.transpose import Transpose
 # from operators.flatten import Flattern

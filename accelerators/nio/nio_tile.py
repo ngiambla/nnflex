@@ -5,7 +5,8 @@ import uuid
 
 from collections import OrderedDict
 
-from accelerators.nio.nio_pe import NioPE
+# from accelerators.nio.nio_pe import NioPE
+from accelerators.nio.nio_piped_pe import NioPE
 
 from core.defines import Operator
 from core.pe import PE
@@ -288,3 +289,11 @@ class NioTile(Tile):
             return False
         self._tile_message = message
         return True
+
+
+    def number_of_stalled_cycles(self):
+        stalls = 0
+        for i in range(self._num_pe_rows):
+            for j in range(self._num_pe_cols):
+                stalls += self._pe_grid[i][j].number_of_stalled_cycles()    
+        return stalls + self._num_stalls

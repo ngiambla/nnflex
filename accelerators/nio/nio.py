@@ -5,8 +5,11 @@ import time
 
 from enum import Enum
 
+# Example of a Non-Pipelined Memory
+#from accelerators.nio.nio_mem import NioMemory
 
-from accelerators.nio.nio_mem import NioMemory
+# Example of a Pipelined Memory.
+from accelerators.nio.nio_mem_piped import NioMemory
 from accelerators.nio.nio_tile import NioTile
 
 from core.defines import Operator
@@ -123,6 +126,7 @@ class Nio(System):
 
         self._cycles_per_layer = self._system_clock_ref.current_clock() - self._cycles_per_layer
         print("\nCycles For Layer ["+flexnode.get_op_name()+"]: " + str(self._cycles_per_layer))
+        print("Stalled Cycles: "+str(self.number_of_stalled_cycles()))
         print("Total Number of Cycles: " + str(self._system_clock_ref.current_clock()))
         print("Simulator Performance Per Layer: "+"{:10.2f} cycles/sec".format(self._cycles_per_layer/(end_time-start_time)))
 
@@ -179,3 +183,10 @@ class Nio(System):
             self._tile_resp_messages.pop(message_idx)
 
 
+
+    def number_of_stalled_cycles(self):
+        num_stalls = 0
+        for i in range(self._num_tile_rows):
+            for j in range(self._num_tile_cols):
+                num_stalls += self._tiles[i][j].number_of_stalled_cycles()
+        return num_stalls + self._memory.number_of_stalled_cycles()

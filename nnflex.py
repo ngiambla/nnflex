@@ -85,6 +85,7 @@ def main():
     parser.add_argument('-m','--model', help='The ONNX File representing the Neural Network', required=True)
     parser.add_argument('-c','--config', help="The YAML file representing the configuation of the accelerator", required=True)
     parser.add_argument('--train', action='store_true',  default=False, help='Trains the network with the request accelerator (Default: False)')    
+    parser.add_argument('-v','--verbose', action='store_true',  default=False, help='Shows Debug Information.')
 
     args = parser.parse_args()
 

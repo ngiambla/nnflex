@@ -13,15 +13,16 @@ class NioPE(PE):
     def __init__(self, system_clock_ref, message_router):
         PE.__init__(self, system_clock_ref, message_router)
         self._pipeline = [None for x in range(0,3)]
-        self._pipeline[0] = IdleStage(self, self._message_router)
+        self._pipeline[0] = FetchStage(self, self._message_router)
         self._pipeline[1] = ExecStage(self)
         self._pipeline[2] = AcknStage(self, self._message_router)
         self._stall = False
-        self._num_stalls = 0
+
     def process(self):
         # If we are stalled, only process a send...
         if self._stall:
             self.pipeline[-1].process()
+            self._num_stalls += 1
             return
         # Otherwise, proceed with processing.
         self._pipeline[2].accept_message(self._pipeline[1].get_message())
@@ -36,8 +37,9 @@ class NioPE(PE):
     def continue_processing(self):
         self._stall = False
 
+
     
-class IdleStage(Stage):
+class FetchStage(Stage):
     def __init__(self, nio_pe, router):
         Stage.__init__(self)
         self._nio_pe = nio_pe
@@ -83,12 +85,12 @@ class ExecStage(Stage):
             self._accumulator = 0
             result = self._accumulator
         elif operator == Operator.MAX:
-            result = int(max(op1, op2))
+            result = max(op1, op2)
         elif operator == Operator.MIN:
-            result = int(min(op1, op2))
+            result = min(op1, op2)
 
         attributes = {
-            "result" : float_to_int_repr_of_float(result)
+            "result" : result
         }
         self._message = Message(self._nio_pe, dest, Message.PEDone, message_id, seq_num, attributes = attributes)
 
@@ -102,6 +104,7 @@ class AcknStage(Stage):
         if self._message is None:
             return
         if not self._router.send(self._message):
+            self._message = None
             self._nio_pe.stall()
         else:
             self._nio_pe.continue_processing()

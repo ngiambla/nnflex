@@ -30,3 +30,10 @@ class Device:
 
         self._message_router = message_router
         self._message_router.add_connection(self, message_queue_size)
+
+        self._num_stalls = 0
+
+    def number_of_stalled_cycles(self):
+        '''
+        '''
+        return self._num_stalls

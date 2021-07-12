@@ -1,6 +1,6 @@
-''' reshape.py:
+''' clip.py:
 
-Implement's the Reshape ONNX node as a flexnode (for use with any accelerator)
+Implement's the clip ONNX node as a flexnode (for use with any accelerator)
 
 '''
 import uuid
@@ -11,10 +11,11 @@ from operators.flexnode import FlexNode
 from core.defines import Operator
 from core.messaging import Message
   
-class Reshape(FlexNode):
+class Clip(FlexNode):
 
     def __init__(self, onnx_node, inputs, outputs):
         FlexNode.__init__(self, onnx_node, inputs, outputs)
+        raise NotImplementedError("Not yet implemented.")
 
     def map(self, memory_mapper):
         pass
@@ -34,6 +35,6 @@ class Reshape(FlexNode):
 
         tile_commands = list()
 
-        np.copyto(self._outputs[0], self._inputs[0].reshape(tuple(self._inputs[1])))
+        #TODO
 
         return tile_commands

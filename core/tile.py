@@ -17,10 +17,7 @@ class Tile(Device):
     
     '''
     def __init__(self, system_clock_ref, message_router, message_queue_size = 2):
-        self._system_clock_ref = system_clock_ref
-        self._message_router = message_router
-        self._message_router.add_connection(self, message_queue_size)
-        
+        Device.__init__(self, system_clock_ref, message_router, message_queue_size)
 
         
     def process(self):
