@@ -88,6 +88,8 @@ class ONNX2Flex:
             self._tensors[layer_outs.name] = self._generate_io_tensor(layer_outs)
 
         for node in model.graph.node:
+            print(node)
+        for node in model.graph.node:
             self._translate_node(node)
 
     def _generate_io_tensor(self, tensor):
@@ -195,15 +197,16 @@ class ONNX2Flex:
 
         # Commented code is TODO.
         # if op_type == "Abs" : return ElementWise(node, inputs, outputs, "Abs")
-        # if op_type == "Add" : return ElementWise(node, inputs, outputs, "Add")
-        # if op_type == "AveragePool" : return AveragePool(node, inputs, outputs)
-        # if op_type == "BatchNormalization" : return BatchNormalization(node, inputs, outputs)
+        if op_type == "Add" : return Arithmetic(node, inputs, outputs, "Add")
+        if op_type == "AveragePool" : return Pooling(node, inputs, outputs, "Avg")
+        if op_type == "BatchNormalization" : return BatchNorm(node, inputs, outputs)
         # if op_type == "Ceil" : return ElementWise(node, inputs, outputs, "Ceil")
+        if op_type == "Clip" : return Clip(node, inputs, outputs)
         # if op_type == "Concat" : return Concat(node, inputs, outputs)
         # if op_type == "Constant" : return Constant(node, inputs, outputs)
         if op_type == "Conv" : return Conv(node, inputs, outputs)
         # if op_type == "ConvInteger" : return ConvInteger(node, inputs, outputs)
-        # if op_type == "Div" : return Arithmetic(node, inputs, outputs, "Div")
+        if op_type == "Div" : return Arithmetic(node, inputs, outputs, "Div")
         # if op_type == "Dropout" : return Dropout(node, inputs, outputs)
         # if op_type == "DynamicQuantizeLinear" : return DynamicQuantizeLinear(node, inputs, outputs)
         # if op_type == "Flatten" : return Flatten(node, inputs, outputs)
@@ -211,14 +214,14 @@ class ONNX2Flex:
         # if op_type == "GlobalAveragePool" : return GlobalAveragePool(node, inputs, outputs)
         if op_type == "Gemm" : return GeMM(node, inputs, outputs)
         # if op_type == "LSTM" :return LSTM(node, inputs, outputs)
-        # if op_type == "MatMul" : return MatMul(node, inputs, outputs)
+        if op_type == "MatMul" : return MatMul(node, inputs, outputs)
         # if op_type == "MatMulInteger" : return MatMulInteger(node, inputs, outputs)
-        # if op_type == "MaxPool" : return MaxPool(node, inputs, outputs)
-        # if op_type == "Mul" : return Arithmetic(nodes, inputs, outputs, "Mul")
+        if op_type == "MaxPool" : return Pooling(node, inputs, outputs, "Max")
+        if op_type == "Mul" : return Arithmetic(nodes, inputs, outputs, "Mul")
         if op_type == "Relu" : return ReLU(node, inputs, outputs)
         if op_type == "Reshape" : return Reshape(node, inputs, outputs)
         # if op_type == "Sigmoid" : return Sigmoid(node, inputs, outputs)
-        # if op_type == "Squeeze" : return Squeeze(node, inputs, outputs)
+        if op_type == "Squeeze" : return Squeeze(node, inputs, outputs)
         # if op_type == "Softmax" : return Softmax(node, inputs, outputs)
         if op_type == "Transpose" : return Transpose(node, inputs, outputs)
         # if op_type == "Unsqueeze" : return Unsqueeze(node, inputs, outputs)

@@ -1,6 +1,6 @@
-''' clip.py:
+''' squeeze.py:
 
-Implement's the clip ONNX node as a flexnode (for use with any accelerator)
+Implement's the Squeeze ONNX node as a flexnode (for use with any accelerator)
 
 '''
 import uuid
@@ -11,21 +11,10 @@ from operators.flexnode import FlexNode
 from core.defines import Operator
 from core.messaging import Message
   
-class Clip(FlexNode):
+class Squeeze(FlexNode):
 
     def __init__(self, onnx_node, inputs, outputs):
         FlexNode.__init__(self, onnx_node, inputs, outputs)
-        self._min = -3.402823466e+38
-        self._max = 3.402823466e+38
-
-        if len(inputs) != 1 and len(inputs) != 3:
-            raise ValueError("Clip can only have 1 or 3 inputs.")
-
-        self._input = inputs[0]
-
-        if len(inputs) == 3:
-            self._min = inputs[1]
-            self._max = inputs[2]        
 
     def map(self, memory_mapper):
         pass
@@ -44,6 +33,6 @@ class Clip(FlexNode):
         tile_commands = list()
 
         # Here, we are NOT generating tile_commands, (although, this is not difficult.)
-        np.copyto(self._outputs[0], np.clip(self._input, self._min, self._max))
+        np.copyto(self._outputs[0], np.squeeze(self._inputs[0], self._inputs[1]))
 
         return tile_commands
