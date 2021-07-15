@@ -1,10 +1,12 @@
+#!/usr/bin/env python3.8
+
+
 ''' nnflex.py: The main hook into the nnflex framework.
 
 Notes:
 
-
-
 '''
+
 import argparse
 import yaml
 
@@ -85,8 +87,8 @@ def main():
     parser = argparse.ArgumentParser(description="NNFlex: A Flexible Neural Network Accelerator Simulation Engine")
     parser.add_argument('-m','--model', help='The ONNX File representing the Neural Network', required=True)
     parser.add_argument('-c','--config', help="The YAML file representing the configuation of the accelerator", required=True)
-    parser.add_argument('--train', action='store_true',  default=False, help='Trains the network with the request accelerator (Default: False)')    
     parser.add_argument('-v','--verbose', action='store_true',  default=False, help='Shows Debug Information.')
+    parser.add_argument('--train', action='store_true',  default=False, help='Trains the network with the request accelerator (Default: False)')    
 
     args = parser.parse_args()
 
