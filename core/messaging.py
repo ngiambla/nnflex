@@ -98,6 +98,3 @@ class Message:
 
                 if not hasattr(self, "op2_addr"):
                     assert hasattr(self, "op2")
-
-            elif self.operation in {Operator.SET}:
-                assert hasattr(self, "setter")

@@ -1,5 +1,6 @@
-'''
+''' flexnode.py
 
+Implements the data-structure which will encompass and inflate an ONNX node for use with NNFlex's messaging system.
 '''
 import numpy as np
 
@@ -17,26 +18,55 @@ class FlexNode:
         return self._onnx_node.op_type
 
     def map(self, memory_mapper):
+        ''' map: Maps all numpy arrays into the memory-system referenced by memory_mapper via
+                NNFlex's memory-allocator.
+        Args:
+            memory_mapper: MemoryMapper object configured with an accelerator's memory system and allocator.
+        '''
         raise NotImplementedError("Specializations must specify this.")
 
 
     def unmap(self, memory_mapper):
+        ''' unmap: Unmaps all numpy arrays from the memory-system referenced by memory_mapper via
+                NNFlex's memory-allocator.
+        Args:
+            memory_mapper: MemoryMapper object configured with an accelerator's memory system and allocator.
+        '''
         raise NotImplementedError("Specializations must specify this.")
 
 
     def _inputs2mem(self, memory_xfer_engine):
+        ''' This internal functions conducts the actual data transfer from numpy-array
+        to memory-system.
+        Args:
+            memory_xfer_engine: MemoryMapper object configured with an accelerator's memory system and allocator.        
+        '''        
         raise NotImplementedError("Specializations must specify this.")
 
 
     def _mem2output(self, memory_xfer_engine):
+        ''' This internal functions conducts the actual data transfer from the memory-system to 
+        the corresponding numpy arrays.
+        Args:
+            memory_xfer_engine: MemoryMapper object configured with an accelerator's memory system and allocator.                 
+        '''        
         raise NotImplementedError("Specializations must specify this.")
 
 
-    def compile(self, source, destination):
+    def compile(self, source, destinations):
+        ''' Compiles the computations for the FlexNode as Tile Messages.
+
+        Args:
+            source: the Device which is sending the messages.
+            destinations: a list of all possible destination devices which can compute this.
+        '''
         raise NotImplementedError("Specializations must specify this.")
 
 
     def fill_attributes(self):
+        ''' When translating the ONNX node to a FlexNode, we MUST interpret any of it's attributes
+        as it will impact how the computation operates.
+        '''
         raise NotImplementedError("Specializations must specify this if required.")
 
 

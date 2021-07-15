@@ -15,6 +15,14 @@ class Transpose(FlexNode):
 
     def __init__(self, onnx_node, inputs, outputs):
         FlexNode.__init__(self, onnx_node, inputs, outputs)
+        self._axes = None
+        self.fill_attributes(onnx_node)
+
+    def fill_attributes(self, onnx_node):
+        for attr in onnx_node.attribute:
+            if attr.name == "perm":
+                self._axes = attr.ints
+
 
     def map(self, memory_mapper):
         pass
@@ -33,7 +41,5 @@ class Transpose(FlexNode):
         '''
 
         tile_commands = list()
-
-        np.copyto(self._outputs[0], self._inputs[0].T)
-
+        np.copyto(self._outputs[0], np.transpose(self._inputs[0], self._axes))
         return tile_commands

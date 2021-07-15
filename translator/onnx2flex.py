@@ -49,10 +49,19 @@ class ONNX2Flex:
         self._node_list = list()
 
     def get_input_attributes(self):
+        ''' returns the attributes associated with the input of the neural network.
+        '''
         for ins in self._onnx_model.graph.input:
             return ins.name, self._tensors[ins.name].shape, self._tensors[ins.name].dtype
 
     def set_input(self, name, tensor):
+        ''' For the name (which should specify the neural-network input) and tensor, the true
+        input-reference will be updated with the user-supplied tensor.
+        
+        Args:
+            name: String representing the tensor-name related to the input of the Neural Network
+            tensor: The user supplied tensor which will be used to update the true reference.
+        '''        
         np.copyto(self._tensors[name], tensor)
 
     def get_output(self):
@@ -130,7 +139,11 @@ class ONNX2Flex:
         return np.zeros(shape=tuple(dims), dtype=element_type)
 
     def get_inputs_to_node(self, node):
-        '''
+        ''' For a given onnx node, we query the ONNX graph and
+        determine it's inputs.
+
+        Args:
+            node: ONNX Node.
         '''
         inputs = list() 
         for ins in node.input:
@@ -141,7 +154,11 @@ class ONNX2Flex:
         return inputs
 
     def get_outputs_of_node(self, node):
-        '''
+        ''' For a given onnx node, we query the ONNX graph and
+        determine it's output(s).
+
+        Args:
+            node: ONNX Node.
         '''
         outputs = list() 
         for outs in node.output:
@@ -152,14 +169,11 @@ class ONNX2Flex:
         return outputs
 
 
-
-    def _find_tensor(self, name):
-        '''
-        '''
-        pass
-
     def _translate_node(self, node):
-        '''
+        ''' Translates the ONNX node into a FlexNode.
+
+        Args:
+            node: ONNX Node.
         '''
         if node.name in self._nodes:
             raise RuntimeError("Node: " + node.name + " was already translated.")
@@ -222,7 +236,7 @@ class ONNX2Flex:
         if op_type == "Reshape" : return Reshape(node, inputs, outputs)
         # if op_type == "Sigmoid" : return Sigmoid(node, inputs, outputs)
         if op_type == "Squeeze" : return Squeeze(node, inputs, outputs)
-        # if op_type == "Softmax" : return Softmax(node, inputs, outputs)
+        if op_type == "Softmax" : return Softmax(node, inputs, outputs)
         if op_type == "Transpose" : return Transpose(node, inputs, outputs)
         # if op_type == "Unsqueeze" : return Unsqueeze(node, inputs, outputs)
         raise NotImplementedError("Operation is not implemented: "+str(op_type))

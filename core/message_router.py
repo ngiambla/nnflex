@@ -9,7 +9,7 @@ from core.clock import ClockReference
 
 
 class MessageQueue:
-    ''' MessageQueue: For each 
+    ''' An object which implements a queue (specifically for messages) with a maximum capacity.
     '''
     def __init__(self, max_availability = 1):
         if max_availability <= 0:

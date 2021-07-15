@@ -7,7 +7,7 @@ A flexible simulator framework for modern and upcoming ML/NN Accelerators.
 
 If PyYAML and NumPy are not already installed, install them.
 ```bash
-pip3 install pyyaml, numpy, onnx, onnxruntime
+pip3 install pyyaml numpy onnx onnxruntime
 ```
 
 Now, clone this repository:
@@ -51,6 +51,12 @@ An example is provided in `examples`:
 python3 nnflex.py -m examples/mnist.onnx -c accel.yaml
 
 ```
+
+## Custom Accelerators:
+
+In order to simulate "any" accelerator, you'll need to implement a _cycle-accurate_ model of the accelerator of your choosing.
+
+Use `accelerators/nio` as a reference. Here we show how we can implement a number of devices that an accelerator may use.
 
 
 ## Tests

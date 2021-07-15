@@ -71,6 +71,8 @@ class NioPE(PE):
                 result = max(op1, op2)
             elif operator == Operator.MIN:
                 result = min(op1, op2)
+            elif operator == Operator.POW:
+                result = op1 ** op2
             else:
                 raise NotImplementedError("Requested Operation is not implemented.")
 

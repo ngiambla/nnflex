@@ -14,6 +14,7 @@ from accelerators import Nio
 from translator.onnx2flex import ONNX2Flex
 import numpy as np
 
+import cProfile
 
 def configure_accelerator(yaml_config):
     print("Configuring Accelerator from: ", yaml_config)
@@ -102,3 +103,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # cProfile.run("main()", sort='time')

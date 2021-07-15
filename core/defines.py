@@ -22,3 +22,4 @@ class Operator(Enum):
     MAX = 8
     MIN = 9
     DOT = 10
+    POW = 11

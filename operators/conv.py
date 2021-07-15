@@ -76,15 +76,16 @@ class Conv(FlexNode):
         self._out_flat = out.flatten()
 
         if len(self._inputs) == 3:
-            in3 = np.broadcast_to(self._inputs[2], self._out_shape)
+            in3 = self._inputs[2]
             self._in3_shape = in3.shape
             self._in3_flat = in3.flatten()
 
         self._in1_offset = memory_mapper.map(self._in1_flat)
         self._in2_offset = memory_mapper.map(self._in2_flat)
         self._out_offset = memory_mapper.map(self._out_flat)
+
         if self._in3_flat is not None:
-            self._in3_offset = memory_mapper.map(self._in3_flat)
+            self._in3_offset = memory_mapper.map(self._in3_flat)     
         self._inputs2mem(memory_mapper)
 
     def unmap(self, memory_mapper):
@@ -149,7 +150,7 @@ class Conv(FlexNode):
                                     if ii0 < 0 or ii0 >= self._in1_shape[2]:
                                         continue
                                     ii1 = i1 + kern1 + self._dilations[1] -1 
-                                    if ii0 < 0 or ii0 >= self._in1_shape[3]:
+                                    if ii1 < 0 or ii1 >= self._in1_shape[3]:
                                         continue
 
                                     in_addrs.append(self.ravel_multi_index([b, c, i0+kern0, i1+kern1], self._in1_shape) + self._in1_offset)
@@ -164,7 +165,7 @@ class Conv(FlexNode):
                         }
 
                         if self._in3_flat is not None:
-                            attributes["bias"] = self.ravel_multi_index([i,j], out_shape) + self._in3_offset
+                            attributes["bias"] = m + self._in3_offset
                         message_stamp = uuid.uuid4()
                         tile_command = Message(source, destination, Message.TileCmd, message_stamp, attributes=attributes)
                         tile_commands.append(tile_command)

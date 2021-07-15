@@ -13,5 +13,6 @@ from operators.matmul import MatMul
 from operators.pooling import Pooling
 from operators.relu import ReLU
 from operators.reshape import Reshape
+from operators.softmax import Softmax
 from operators.squeeze import Squeeze
 from operators.transpose import Transpose

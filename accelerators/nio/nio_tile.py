@@ -13,6 +13,7 @@ from core.pe import PE
 from core.tile import Tile
 from core.messaging import Message
 from core.message_router import MessageRouter
+from core.cache import Cache
 
 from core.utils import *
 
@@ -63,7 +64,15 @@ class NioTile(Tile):
         self._current_stage = self.IDLE
         self._next_stage = self.IDLE
 
+        self._cache = Cache(10000)
 
+
+    def load_cache(self, address_list):
+        for addr in address_list:
+            self._cache.install(addr, self._memory_system_peek(addr))
+
+    def evict_cache_lines(self):
+        self._cache.clear()
 
     def process(self):
 
@@ -106,34 +115,36 @@ class NioTile(Tile):
                     self._read_responses["2"] = msg.op2
 
             elif op in {Operator.DOT}:
-                idx = 0
-                msg_stamp = uuid.uuid4()                    
-                for addr in msg.col_addrs:
-                    attributes = {
-                        "addr" : int(addr)
-                    }   
-                    self._reads_to_send.append(Message(self, self._offchip_memory, Message.MemRead, msg_stamp, idx, attributes=attributes))
-                    self._read_responses[str(msg_stamp)+str(idx)] = None
+                for data_row in [msg.col_addrs, msg.row_addrs]:
+                    idx = 0
+                    msg_stamp = uuid.uuid4()
+                    for addr in data_row:
+                        contents = self._cache.lookup(addr)
+                        if contents is None:
+                            attributes = {
+                                "addr" : int(addr)
+                            }   
+                            self._reads_to_send.append(Message(self, self._offchip_memory, Message.MemRead, msg_stamp, idx, attributes=attributes))
+                            self._read_responses[str(msg_stamp)+str(idx)] = None
+                        else:
+                            self._read_responses[str(msg_stamp)+str(idx)] = contents
+                        idx+=1
 
-                    idx+=1
+                    if self._cache.lookup(msg.res_addr) is not None:
+                        raise ValueError("Cache will fail.")
 
-                msg_stamp = uuid.uuid4()                    
-                for addr in msg.row_addrs:
-                    attributes = {
-                        "addr" : int(addr)
-                    }   
-                    self._reads_to_send.append(Message(self, self._offchip_memory, Message.MemRead, msg_stamp, idx, attributes=attributes))
-                    self._read_responses[str(msg_stamp)+str(idx)] = None
-
-                    idx +=1
 
                 if msg.bias is not None:
-                    attributes = {
-                        "addr" : int(msg.bias)
-                    }   
-                    msg_stamp = uuid.uuid4()                
-                    self._reads_to_send.append(Message(self, self._offchip_memory, Message.MemRead, msg_stamp, idx, attributes=attributes))
-                    self._read_responses[str(msg_stamp)+str(idx)] = None
+                    contents = self._cache.lookup(msg.bias)
+                    if contents is None:                    
+                        attributes = {
+                            "addr" : int(msg.bias)
+                        }   
+                        msg_stamp = uuid.uuid4()                
+                        self._reads_to_send.append(Message(self, self._offchip_memory, Message.MemRead, msg_stamp, idx, attributes=attributes))
+                        self._read_responses[str(msg_stamp)+str(idx)] = None
+                    else:
+                        self._read_responses[str(msg_stamp)+str(idx)] = contents
 
             else:
                 raise ValueError("Unhandled operation during FETCH.")
@@ -146,9 +157,6 @@ class NioTile(Tile):
             if self._reads_to_send:
                 message = self._reads_to_send[0]
                 if self._message_router.send(message):
-                    msg_identifier = str(message.message_id)+str(message.seq_num)
-                    if msg_identifier not in self._read_responses:
-                        raise ValueError("Memory-Read Mismatch.")
                     self._reads_to_send.pop(0)
 
 
@@ -157,9 +165,10 @@ class NioTile(Tile):
                 if read_id not in self._read_responses:
                     raise ValueError("Memory Read Response Mismatch. Received Message: "+read_id)
                 self._read_responses[read_id] = self._device_message.content
+                self._cache.install(self._device_message.addr, self._device_message.content)
                 self._device_message = None
 
-            if None not in self._read_responses.values() and not self._reads_to_send:
+            if not self._reads_to_send and None not in self._read_responses.values():
                 self._next_stage = self.DISPATCH_TO_PE
 
                 msg = self._tile_message
@@ -184,7 +193,7 @@ class NioTile(Tile):
 
                     values = list(self._read_responses.values())
                     for i in range(len(msg.col_addrs)):
-                        msg_stamp = uuid.uuid4()  
+                        msg_stamp = uuid.uuid4() 
                         attributes = {
                             "operation" : Operator.CMAC if i == 0 else Operator.MAC,
                             "dtype" : msg.dtype,
@@ -195,7 +204,7 @@ class NioTile(Tile):
 
         
                     if msg.bias is not None:
-                        msg_stamp = uuid.uuid4()  
+                        msg_stamp = uuid.uuid4()
                         attributes = {
                             "operation" : Operator.MAC,
                             "dtype" : msg.dtype,
@@ -225,7 +234,7 @@ class NioTile(Tile):
                 self._device_message = None    
 
 
-            if None not in self._dispatch_queue_ack.values() and not self._dispatch_queue:
+            if not self._dispatch_queue and None not in self._dispatch_queue_ack.values():
                 self._next_stage = self.WRITE_BACK
                 attributes = {
                     "dtype" : self._tile_message.dtype,
@@ -257,7 +266,7 @@ class NioTile(Tile):
         if self._current_stage == self.SEND_ACK:
             self._next_stage = self.SEND_ACK
             if self._tile_message_router.send(self._tile_ack):
-                self._next_stage = self.IDLE
+                self._current_stage = self.IDLE
 
         if self._current_stage == self.IDLE:
             # Clear out state from last transaction.            

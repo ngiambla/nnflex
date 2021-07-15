@@ -29,13 +29,23 @@ class NioMemory(Memory):
 
         self._shared_fetch_pipe = MemoryStageFetch(self, message_router)
 
-        self._read_pipeline = [None for x in range(0, 2)]
-        self._read_pipeline[0] = READStageI(self, message_router)
-        self._read_pipeline[1] = READStageII(self, message_router)
+        self._pipeline_size = 2
 
-        self._write_pipeline = [None for x in range(0, 2)]
+        self._pipeline_sequence = list(range(1, self._pipeline_size))
+        self._pipeline_reversed = self._pipeline_sequence[::-1]
+        
+
+        self._read_pipeline = [None for x in range(0, self._pipeline_size)]
+        self._read_pipeline[0] = READStageI(self, message_router)
+        for i in range(1, self._pipeline_size-1):
+            self._read_pipeline[i] = MemoryFillStage()
+        self._read_pipeline[self._pipeline_size-1] = READStageII(self, message_router)
+
+        self._write_pipeline = [None for x in range(0, self._pipeline_size)]
         self._write_pipeline[0] = WriteStageI(self, message_router)
-        self._write_pipeline[1] = WriteStageII(self, message_router)
+        for i in range(1, self._pipeline_size-1):
+            self._write_pipeline[i] = MemoryFillStage()        
+        self._write_pipeline[self._pipeline_size-1] = WriteStageII(self, message_router)
 
         self._stall = False
         self._num_stalls = 0
@@ -53,7 +63,7 @@ class NioMemory(Memory):
             return 
         
 
-        for i in [1]:
+        for i in self._pipeline_reversed:
             self._write_pipeline[i].accept_message(self._write_pipeline[i-1].get_message())
             self._read_pipeline[i].accept_message(self._read_pipeline[i-1].get_message())
 
@@ -79,6 +89,10 @@ class NioMemory(Memory):
 
     def stall(self):
         self._stall = True
+
+
+    def is_stalled(self):
+        return self._stall
 
     def continue_processing(self):
         self._stall = False
@@ -164,7 +178,8 @@ class READStageII(Stage):
         if self._message is None:
             return
         
-        self._nio_memory.continue_processing()
+        if not self._nio_memory.is_stalled():
+            self._nio_memory.continue_processing()
         if not self._router.send(self._message):
             self._message = None
             self._nio_memory.stall()

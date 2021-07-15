@@ -15,9 +15,16 @@ class Arithmetic(FlexNode):
     def __init__(self, onnx_node, inputs, outputs, operation):
         FlexNode.__init__(self, onnx_node, inputs, outputs)
 
-
+        self._in1_shape = None
+        self._in1_flat = None
         self._in1_offset = 0
-        self._in2_offset = 0 
+
+        self._in2_shape = None
+        self._in2_flat = None
+        self._in2_offset = 0
+
+        self._out_shape = None
+        self._out_flat = None        
         self._out_offset = 0
 
         if operation == "Div":
@@ -35,8 +42,13 @@ class Arithmetic(FlexNode):
         in2 = self._inputs[1]
         out = self._outputs[0]
 
+        self._in1_shape = in1.shape
         self._in1_flat = in1.flatten()
+
+        self._in2_shape = in2.shape
         self._in2_flat = in2.flatten()
+
+        self._out_shape = out.shape
         self._out_flat = out.flatten()
 
         self._length = len(self._in1_flat)
@@ -70,7 +82,7 @@ class Arithmetic(FlexNode):
         num_destinations = len(destinations)
         which_dest = 0
 
-        for i in range(len(self._length)):
+        for i in range(self._length):
             op1_addr = self._in1_offset+i
             op2_addr = self._in2_offset+i
             res_addr = self._out_offset+i

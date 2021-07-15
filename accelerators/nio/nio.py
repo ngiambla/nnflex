@@ -25,7 +25,7 @@ class Nio(System):
 
     '''
 
-    def __init__(self, num_tile_rows, num_tile_cols, memory_width = int(1e6)):
+    def __init__(self, num_tile_rows, num_tile_cols, memory_width = int(1e8)):
         System.__init__(self)
 
 
@@ -87,8 +87,10 @@ class Nio(System):
 
         # Map the node's input and outputs to memory.
         flexnode.map(self._memory_mapper)
+        print("Compiling Layer ["+flexnode.get_op_name()+"]")
 
-        self._tile_commands = flexnode.compile(self, self._tiles_flat)
+        self._tile_commands = flexnode.compile(self, self._tiles_flat)   
+
 
         # Set the layer progress.
         self._tile_cmds_per_layer = len(self._tile_commands)
@@ -99,20 +101,17 @@ class Nio(System):
 
         self._layer_progress = 0
 
+        i = 0
+        sent_command_count = 0
+
         while self._tile_commands or self._tile_required_resp:
             self._fetch_tile_resp_messages()
-            
-            sent_command_count = 0
-            for i in range(len(self._tile_commands)):
-                tile_message = self._tile_commands[i]
 
-                if tile_message is None:
-                    sent_command_count += 1
-                    continue
-
-                if self._tile_message_router.send(tile_message):
-                    self._tile_required_resp.add(tile_message.message_id)
-                    self._tile_commands[i] = None
+            while i < len(self._tile_commands) and self._tile_message_router.send(self._tile_commands[i]):
+                self._tile_required_resp.add(self._tile_commands[i].message_id)
+                self._tile_commands[i] = None
+                i += 1
+                sent_command_count += 1
 
             self.progress()
             self.process()
@@ -123,6 +122,11 @@ class Nio(System):
 
         flexnode.unmap(self._memory_mapper)
         end_time = time.time()
+
+        # Clear the cache after every layer.
+        for i in range(self._num_tile_rows):
+            for j in range(self._num_tile_cols):
+                self._tiles[i][j].evict_cache_lines()        
 
         self._cycles_per_layer = self._system_clock_ref.current_clock() - self._cycles_per_layer
         print("\nCycles For Layer ["+flexnode.get_op_name()+"]: " + str(self._cycles_per_layer))
@@ -143,7 +147,8 @@ class Nio(System):
         dot_index = self._system_clock_ref.current_clock() % bar_size
         progress = progress[:dot_index] + "." + progress[dot_index+1:]
         percentage = " {:5.2f}% Complete".format(100*self._layer_progress/self._tile_cmds_per_layer)
-        print(progress_header+progress+percentage, end = "")
+        fraction = " [{:10d}/{:10d}]".format(self._layer_progress, self._tile_cmds_per_layer) 
+        print(progress_header+progress+percentage+fraction, end = "")
 
 
     def process(self):
@@ -179,7 +184,9 @@ class Nio(System):
             self._layer_progress += 1
             messages_to_remove.append(i)
 
-        for message_idx in messages_to_remove:
+        reversed_messages = messages_to_remove
+        reversed_messages.reverse()
+        for message_idx in reversed_messages:
             self._tile_resp_messages.pop(message_idx)
 
 
