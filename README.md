@@ -1,9 +1,11 @@
-# NNFLex
+# NNFlex
 
 
 A flexible simulator framework for modern and upcoming ML/NN Accelerators.
 
-## Installation
+## Installation and Requirements
+
+NNFlex requires _Python3.8+_.
 
 If PyYAML and NumPy are not already installed, install them.
 ```bash
@@ -59,6 +61,41 @@ In order to simulate "any" accelerator, you'll need to implement a _cycle-accura
 Use `accelerators/nio` as a reference. Here we show how we can implement a number of devices that an accelerator may use.
 
 
+## Features:
+
+ONNX Operations Supported:
+
+* Add: Full support
+* AveragePool: Full Support
+* BatchNormalization: Requires Verification
+* Clip: Requires Verification
+* Conv: Requires handling of Strides and Channel Grouping
+* Div: Full Support
+* Gemm: Full Support
+* MatMul: Full Support
+* MaxPool: Requires Verification
+* Mul: Full Support
+* Relu: Full Support        
+* Reshape: Full Support
+* Squeeze: Full Support
+* Softmax: Requires Verification
+* Transpose: Full Support
+
+NNFlex provides the following classes for accelerator-device specialization:
+
+* Cache
+* Memory
+* PE
+* Tile
+* System
+
+Please read through `accelerators/nio` to see the use cases of these abstract classes.
+NNFlex also supports memory-mapping. Specifically, numpy-arrays are easily "mapped" (malloc'd) into the accelerator's memory. Operations on the numpy arrays are tracked implicitly (Python is pass-by-reference). Of course, mapped memory can be free'd as well.
+Running through MNIST with nnflex and nio takes about 3 seconds.
+
+Memory transactions are logged (at the request of the user) and output to a file suitable for consumption by `dramsim2`
+
+
 ## Tests
 
 
@@ -106,3 +143,5 @@ For any contributor, add what you've done.
 
 Nicholas V. Giamblanco, B.Eng., M.A.Sc., 2021.
 
+
+If you use this repository in published work, please reference it.
