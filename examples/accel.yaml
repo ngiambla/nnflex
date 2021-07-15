@@ -1,0 +1,7 @@
+# An example configuration file to define the accelerator config.
+
+accelerator: nio
+num_tile_rows: 2
+num_tile_cols: 2
+
+# End of file.
